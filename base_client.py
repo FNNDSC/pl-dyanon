@@ -10,7 +10,7 @@ class BaseClient(ABC):
         pass
 
     @abstractmethod
-    def anonymize(self, params: dict):
+    def anonymize(self, params: dict, pv_id: int):
         pass
 
     @abstractmethod

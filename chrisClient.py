@@ -17,7 +17,7 @@ class ChrisClient(BaseClient):
     def pacs_push(self):
         pass
 
-    def anonymize(self, params: dict):
+    def anonymize(self, params: dict, pv_id: int):
         prefix = "dynanon"
         feed_name = self.__create_feed_name(prefix,params["search"])
         # search for dicom dir
@@ -26,12 +26,21 @@ class ChrisClient(BaseClient):
 
         # run dircopy
         pl_id = self.__get_plugin_id({"name":"pl-dsdircopy","version":"1.0.2"})
-        pv_in_id = self.__create_feed(pl_id,{"previous_id":1,'dir':dicom_dir,'title':feed_name})
+        pv_in_id = self.__create_feed(pl_id,{"previous_id":pv_id,'dir':dicom_dir,'title':feed_name})
         # run dicom_headeredit
-        pl_sub_id = self.__get_plugin_id({"name":"pl-pfdicom_tagsub", "version":"3.2.4"})
+        pl_sub_id = self.__get_plugin_id({"name":"pl-pfdicom_tagsub", "version":"3.3.4"})
         data = {"previous_id": pv_in_id, "tagStruct": anon_params, 'fileFilter': '.dcm'}
-        self.__create_feed(pl_sub_id, data)
-        pass
+        tag_sub_id = self.__create_feed(pl_sub_id, data)
+        pl_dcm_id = self.__get_plugin_id({"name":"pl-dicom_dirsend", "version":"1.2.0"})
+        dir_send_data = {
+            "previous_id": tag_sub_id,
+            'fileFilter': "dcm",
+            "host": params["send"]["host"],
+            "port":params["send"]["port"],
+            "calledAETitle": params["send"]["aec"]
+        }
+        self.__create_feed(pl_dcm_id, dir_send_data)
+
 
     def __create_feed(self, plugin_id: str,params: dict):
         response = self.cl.create_plugin_instance(plugin_id, params)
@@ -53,17 +62,15 @@ class ChrisClient(BaseClient):
         mylist = []
         for key in params.keys():
             mylist.append(params[key])
-        #{"fname_icontains": mylist[0]})
-        files = self.cl.get_pacs_series_list(params)
-        print(files)
+        files = self.cl.get_pacs_files({"fname_icontains": mylist[0]})
+
         l_dir_path = set()
-        for file in files:
-            print(file)
-        # for file in files['links']:
-        #     file_path = file['fname']
-        #     file_name = file_path.split('/')[-1]
-        #     dir_path = file_path.replace(file_name, '')
-        #     l_dir_path.add(dir_path)
-        # return ','.join(l_dir_path)
+
+        for file in files['data']:
+            file_path = file['fname']
+            file_name = file_path.split('/')[-1]
+            dir_path = file_path.replace(file_name, '')
+            l_dir_path.add(dir_path)
+        return ','.join(l_dir_path)
 
 

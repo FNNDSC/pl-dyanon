@@ -2,13 +2,28 @@
 
 from pathlib import Path
 from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
-
+from pflog import pflog
+from loguru import logger
 from chris_plugin import chris_plugin, PathMapper
 import pandas as pd
 import json
 import itertools
 from collections import ChainMap
 from chrisClient import ChrisClient
+import sys
+
+LOG = logger.debug
+
+logger_format = (
+    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> │ "
+    "<level>{level: <5}</level> │ "
+    "<yellow>{name: >28}</yellow>::"
+    "<cyan>{function: <30}</cyan> @"
+    "<cyan>{line: <4}</cyan> ║ "
+    "<level>{message}</level>"
+)
+logger.remove()
+logger.add(sys.stderr, format=logger_format)
 
 __version__ = '1.0.0'
 
@@ -28,15 +43,12 @@ parser = ArgumentParser(description='!!!CHANGE ME!!! An example ChRIS plugin whi
                                     'counts the number of occurrences of a given '
                                     'word in text files.',
                         formatter_class=ArgumentDefaultsHelpFormatter)
-parser.add_argument('-w', '--word', required=True, type=str,
-                    help='word to count')
-parser.add_argument('-p', '--pattern', default='**/*.txt', type=str,
-                    help='input file filter glob')
+
 parser.add_argument('-V', '--version', action='version',
                     version=f'%(prog)s {__version__}')
 parser.add_argument(
     "--pattern",
-    default="**/*dcm",
+    default="**/*csv",
     help="""
             pattern for file names to include (you should quote this!)
             (this flag triggers the PathMapper on the inputdir).""",
@@ -47,10 +59,26 @@ parser.add_argument(
     help="plugin instance ID from which to start analysis",
 )
 parser.add_argument(
+    "--searchIdx",
+    default="",
+    help="comma separated indices of columns containing search data",
+)
+parser.add_argument(
+    "--anonIdx",
+    default="",
+    help="comma separated indices of columns containing anonymization data",
+)
+parser.add_argument(
     "--CUBEurl", default="http://localhost:8000/api/v1/", help="CUBE URL"
 )
 parser.add_argument("--CUBEuser", default="chris", help="CUBE/ChRIS username")
 parser.add_argument("--CUBEpassword", default="chris1234", help="CUBE/ChRIS password")
+parser.add_argument('-n', '--remoteHost', default='0.0.0.0', type=str,
+                    help='Remote Host IP')
+parser.add_argument('-p', '--remotePort', default='4242', type=str,
+                    help='Remote Host port')
+parser.add_argument('-a', '--aec', default='ChRIS', type=str,
+                    help='called AE title')
 parser.add_argument(
     "--pftelDB",
     help="an optional pftel telemetry logger, of form '<pftelURL>/api/v1/<object>/<collection>/<event>'",
@@ -93,61 +121,53 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
     #
     # Refer to the documentation for more options, examples, and advanced uses e.g.
     # adding a progress bar and parallelism.
-    mapper = PathMapper.file_mapper(inputdir, outputdir, glob=options.pattern, suffix='.count.txt')
+    mapper = PathMapper.file_mapper(inputdir, outputdir, glob=options.pattern)
     for input_file, output_file in mapper:
-        # The code block below is a small and easy example of how to use a ``PathMapper``.
-        # It is recommended that you put your functionality in a helper function, so that
-        # it is more legible and can be unit tested.
-        data = input_file.read_text()
-        frequency = data.count(options.word)
-        output_file.write_text(str(frequency))
+
+        df = pd.read_csv(input_file)
+        l_job = create_query(df, options.searchIdx, options.anonIdx)
+
+        for d_job in l_job:
+            d_job["send"] = {
+                "host" : options.remoteHost,
+                "port" : options.remotePort,
+                "aec"  : options.aec
+            }
+            LOG(d_job)
+
+            # create connection object
+            cube_con = ChrisClient(options.CUBEurl,options.CUBEuser, options.CUBEpassword)
+
+            #submit job for anonymization
+            cube_con.anonymize(d_job, options.pluginInstanceID)
 
 
 if __name__ == '__main__':
     main()
-
-
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
 def create_query(df: pd.DataFrame, str_srch_idx: str, str_anon_idx: str):
     l_srch_idx = list(map(int,str_srch_idx.split(',')))
     l_anon_idx = list(map(int,str_anon_idx.split(',')))
 
-    # create connection object
-    cube_con = ChrisClient("http://localhost:8000/api/v1/", "chris", "chris1234")
+    l_job = []
 
     for row in df.iterrows():
         d_job = {}
-        s_col = (df.columns[l_srch_idx].values)
-        s_row = (row[1][l_srch_idx].values)
-        s_d = [{k: v} for k, v in zip(s_col, s_row)]
 
+        s_col = (df.columns[l_srch_idx].values)
+        s_row = (row[1].iloc[l_srch_idx].values)
+        s_d = [{k: v} for k, v in zip(s_col, s_row)]
         d_job["search"] = dict(ChainMap(*s_d))
+
         a_col=(df.columns[l_anon_idx].values)
-        a_row=(row[1][l_anon_idx].values)
+        a_row=(row[1].iloc[l_anon_idx].values)
         a_d = [{k.split('.')[0]:v} for k,v in zip(a_col,a_row)]
         d_job["anon"] = dict(ChainMap(*a_d))
 
-        print(d_job)
-        submit_job(cube_con, d_job)
+        l_job.append(d_job)
+
+    return l_job
 
 
-
-def serialize_csv(file_path: str, anon_all: bool):
-    df = pd.read_csv(file_path)
-    search_idx = "1"
-    anon_id = "0,2,3,4"
-    create_query(df,search_idx,anon_id)
-
-
-def submit_job(con: ChrisClient, job: dict):
-    con.anonymize(job)
-
-
-
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    file_path: str ="./sample3.csv"
-    anon_all: bool = False
-    serialize_csv(file_path, anon_all)
 

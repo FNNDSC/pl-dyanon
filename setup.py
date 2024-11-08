@@ -25,7 +25,7 @@ setup(
     author='FNNDSC',
     author_email='dev@babyMRI.org',
     url='https://github.com/FNNDSC/pl-dy',
-    py_modules=['dyanon'],
+    py_modules=['dyanon','base_client','chrisClient'],
     install_requires=['chris_plugin'],
     license='MIT',
     entry_points={
