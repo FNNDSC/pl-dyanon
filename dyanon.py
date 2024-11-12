@@ -10,6 +10,7 @@ import json
 import itertools
 from collections import ChainMap
 from chrisClient import ChrisClient
+import pfdcm
 import sys
 
 LOG = logger.debug
@@ -79,6 +80,10 @@ parser.add_argument('-p', '--remotePort', default='4242', type=str,
                     help='Remote Host port')
 parser.add_argument('-a', '--aec', default='ChRIS', type=str,
                     help='called AE title')
+parser.add_argument('--PACSurl', default='', type=str,
+                    help='endpoint URL of pfdcm')
+parser.add_argument('--PACSname', default='MINICHRISORTHANC', type=str,
+                    help='name of the PACS')
 parser.add_argument(
     "--pftelDB",
     help="an optional pftel telemetry logger, of form '<pftelURL>/api/v1/<object>/<collection>/<event>'",
@@ -134,6 +139,9 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
                 "aec"  : options.aec
             }
             LOG(d_job)
+
+            # register DICOMs using pfdcm
+            pfdcm.register_pacsfiles(d_job["search"], options.PACSurl, options.PACSname)
 
             # create connection object
             cube_con = ChrisClient(options.CUBEurl,options.CUBEuser, options.CUBEpassword)
