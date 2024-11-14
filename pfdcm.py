@@ -53,7 +53,7 @@ def get_pfdcm_status(directive: dict, url: str, pacs_name: str):
     by running the synchronous API of `pfdcm`
     """
 
-    pfdcm_status_url = f'{url}/PACS/sync/pypx/'
+    pfdcm_status_url = f'{url}PACS/sync/pypx/'
     headers = {'Content-Type': 'application/json', 'accept': 'application/json'}
 
     body = {
@@ -77,4 +77,4 @@ def get_pfdcm_status(directive: dict, url: str, pacs_name: str):
         response = requests.post(pfdcm_status_url, json=body, headers=headers)
         return response
     except Exception as ex:
-        print(er)
+        print(ex)

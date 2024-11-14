@@ -141,6 +141,18 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
             }
             LOG(d_job)
 
+            # search for DICOMs in PACS
+            search_response = pfdcm.get_pfdcm_status(d_job["search"], options.PACSurl, options.PACSname)
+            d_response = json.loads(search_response.text)
+            file_count = 0
+            for l_series in d_response['pypx']['data']:
+                for series in l_series["series"]:
+                    LOG(series["SeriesDescription"]["value"])
+                    if "Lower" in series["SeriesDescription"]["value"]:
+                        file_count += int(series["NumberOfSeriesRelatedInstances"]["value"])
+            LOG(file_count)
+
+
             # register DICOMs using pfdcm
             response = pfdcm.register_pacsfiles(d_job["search"], options.PACSurl, options.PACSname)
             LOG(response)
@@ -157,7 +169,7 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
                 series = cube_con.cl.get_pacs_series_list(d_job['search'])
 
             #submit job for anonymization
-            cube_con.anonymize(d_job, options.pluginInstanceID)
+            #cube_con.anonymize(d_job, options.pluginInstanceID)
 
 
 if __name__ == '__main__':
