@@ -12,6 +12,7 @@ from collections import ChainMap
 from chrisClient import ChrisClient
 import pfdcm
 import sys
+import time
 
 LOG = logger.debug
 
@@ -141,10 +142,19 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
             LOG(d_job)
 
             # register DICOMs using pfdcm
-            pfdcm.register_pacsfiles(d_job["search"], options.PACSurl, options.PACSname)
+            response = pfdcm.register_pacsfiles(d_job["search"], options.PACSurl, options.PACSname)
+            LOG(response)
 
             # create connection object
             cube_con = ChrisClient(options.CUBEurl,options.CUBEuser, options.CUBEpassword)
+
+            # verify registration
+            series = cube_con.cl.get_pacs_series_list(d_job['search'])
+
+            while not series['total'] > 0:
+                LOG("sleeping for 2 seconds")
+                time.sleep(2)
+                series = cube_con.cl.get_pacs_series_list(d_job['search'])
 
             #submit job for anonymization
             cube_con.anonymize(d_job, options.pluginInstanceID)
