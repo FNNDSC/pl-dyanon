@@ -130,7 +130,7 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
     mapper = PathMapper.file_mapper(inputdir, outputdir, glob=options.pattern)
     for input_file, output_file in mapper:
 
-        df = pd.read_csv(input_file)
+        df = pd.read_csv(input_file,dtype=str)
         l_job = create_query(df, options.searchIdx, options.anonIdx)
 
         for d_job in l_job:
@@ -141,35 +141,37 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
             }
             LOG(d_job)
 
+            search_dir, _ = pfdcm.sanitize(d_job["search"])
+
             # search for DICOMs in PACS
-            search_response = pfdcm.get_pfdcm_status(d_job["search"], options.PACSurl, options.PACSname)
-            d_response = json.loads(search_response.text)
-            file_count = 0
-            for l_series in d_response['pypx']['data']:
-                for series in l_series["series"]:
-                    LOG(series["SeriesDescription"]["value"])
-                    if "Lower" in series["SeriesDescription"]["value"]:
-                        file_count += int(series["NumberOfSeriesRelatedInstances"]["value"])
-            LOG(file_count)
+            search_response = pfdcm.get_pfdcm_status(search_dir, options.PACSurl, options.PACSname)
+            autofill_directive, count = pfdcm.autocomplete_directive(d_job["search"], search_response)
+            LOG(f"{count} files found matching in PACS")
+            if count > 0:
 
+                # register DICOMs using pfdcm
+                response = pfdcm.register_pacsfiles(autofill_directive, options.PACSurl, options.PACSname)
+                d_response = json.loads(response.text)
+                LOG(d_response)
 
-            # register DICOMs using pfdcm
-            response = pfdcm.register_pacsfiles(d_job["search"], options.PACSurl, options.PACSname)
-            LOG(response)
+                # status for DICOMs in PACS
+                search_response = pfdcm.get_pfdcm_status(autofill_directive, options.PACSurl, options.PACSname)
+                d_s_resp = json.loads(search_response.text)
+                LOG(d_s_resp)
 
-            # create connection object
-            cube_con = ChrisClient(options.CUBEurl,options.CUBEuser, options.CUBEpassword)
+                # create connection object
+                cube_con = ChrisClient(options.CUBEurl,options.CUBEuser, options.CUBEpassword)
 
-            # verify registration
-            series = cube_con.cl.get_pacs_series_list(d_job['search'])
+                # verify registration
+                series = cube_con.cl.get_pacs_series_list(autofill_directive)
+                while not series['total'] > 0:
+                    LOG("waiting for registration")
+                    time.sleep(2)
+                    series = cube_con.cl.get_pacs_series_list(autofill_directive)
 
-            while not series['total'] > 0:
-                LOG("sleeping for 2 seconds")
-                time.sleep(2)
-                series = cube_con.cl.get_pacs_series_list(d_job['search'])
+                d_job["search"] = autofill_directive
+                cube_con.anonymize(d_job, options.pluginInstanceID)
 
-            #submit job for anonymization
-            #cube_con.anonymize(d_job, options.pluginInstanceID)
 
 
 if __name__ == '__main__':

@@ -2,12 +2,14 @@
 
 from base_client import BaseClient
 from chrisclient import client
+from chris_pacs_service import PACSClient
 import json
 
 class ChrisClient(BaseClient):
     def __init__(self, url: str, username: str, password: str):
         self.cl = client.Client(url, username, password)
         self.cl.pacs_series_url = "http://localhost:8000/api/v1/pacs/series/"
+        self.req = PACSClient(username,password)
 
     def create_con(self,params:dict):
         return self.cl
@@ -21,7 +23,7 @@ class ChrisClient(BaseClient):
         prefix = "dynanon"
         feed_name = self.__create_feed_name(prefix,params["search"])
         # search for dicom dir
-        dicom_dir = self.__get_dir_path(params["search"])
+        dicom_dir = self.req.get_pacs_files(params["search"])
         anon_params = json.dumps(params["anon"])
 
         # run dircopy
@@ -58,19 +60,5 @@ class ChrisClient(BaseClient):
             return response['data'][0]['id']
         raise Exception(f"No plugin found with matching search criteria {params}")
 
-    def __get_dir_path(self, params: dict):
-        mylist = []
-        for key in params.keys():
-            mylist.append(params[key])
-        files = self.cl.get_pacs_files({"fname_icontains": mylist[0]})
-
-        l_dir_path = set()
-
-        for file in files['data']:
-            file_path = file['fname']
-            file_name = file_path.split('/')[-1]
-            dir_path = file_path.replace(file_name, '')
-            l_dir_path.add(dir_path)
-        return ','.join(l_dir_path)
 
 
