@@ -78,28 +78,24 @@ parser.add_argument("--CUBEpassword", default="chris1234", help="CUBE/ChRIS pass
 parser.add_argument('--orthancUrl', '-o',
                   dest='orthancUrl',
                   type=str,
-                  optional=True,
                   help='Orthanc server url',
                   default='http://0.0.0.0:8042')
 
-parser.add_argument('--username', '-u',
+parser.add_argument('--orthancUsername', '-u',
                   dest='username',
                   type=str,
-                  optional=True,
                   help='Orthanc server username',
                   default='orthanc')
 
-parser.add_argument('--password', '-p',
+parser.add_argument('--orthancPassword', '-p',
                   dest='password',
                   type=str,
-                  optional=True,
                   help='Orthanc server password',
                   default='orthanc')
 
 parser.add_argument('--pushToRemote', '-r',
                   dest='pushToRemote',
                   type=str,
-                  optional=True,
                   help='Remote modality',
                   default='')
 parser.add_argument('--PACSurl', default='', type=str,
@@ -156,9 +152,11 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
 
         for d_job in l_job:
             d_job["send"] = {
-                "host" : options.remoteHost,
-                "port" : options.remotePort,
-                "aec"  : options.aec
+                "url" : options.orthancUrl,
+                "username" : options.username,
+                "password" : options.password,
+                "aec"      : options.pushToRemote
+
             }
             LOG(d_job)
 

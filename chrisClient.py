@@ -37,9 +37,9 @@ class ChrisClient(BaseClient):
         dir_send_data = {
             "previous_id": tag_sub_id,
             'inputFileFilter': "**/*dcm",
-            "orthancUrl": params["send"]["host"],
-            "username":params["send"]["port"],
-            "password": params["send"]["port"],
+            "orthancUrl": params["send"]["url"],
+            "username":params["send"]["username"],
+            "password": params["send"]["password"],
             "pushToRemote": params["send"]["aec"]
         }
         self.__create_feed(pl_dcm_id, dir_send_data)
