@@ -33,13 +33,14 @@ class ChrisClient(BaseClient):
         pl_sub_id = self.__get_plugin_id({"name":"pl-pfdicom_tagsub", "version":"3.3.4"})
         data = {"previous_id": pv_in_id, "tagStruct": anon_params, 'fileFilter': '.dcm'}
         tag_sub_id = self.__create_feed(pl_sub_id, data)
-        pl_dcm_id = self.__get_plugin_id({"name":"pl-dicom_dirsend", "version":"1.2.0"})
+        pl_dcm_id = self.__get_plugin_id({"name":"pl-orthanc_push", "version":"1.2.7"})
         dir_send_data = {
             "previous_id": tag_sub_id,
-            'fileFilter': "dcm",
-            "host": params["send"]["host"],
-            "port":params["send"]["port"],
-            "calledAETitle": params["send"]["aec"]
+            'inputFileFilter': "**/*dcm",
+            "orthancUrl": params["send"]["host"],
+            "username":params["send"]["port"],
+            "password": params["send"]["port"],
+            "pushToRemote": params["send"]["aec"]
         }
         self.__create_feed(pl_dcm_id, dir_send_data)
 

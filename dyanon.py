@@ -75,12 +75,33 @@ parser.add_argument(
 )
 parser.add_argument("--CUBEuser", default="chris", help="CUBE/ChRIS username")
 parser.add_argument("--CUBEpassword", default="chris1234", help="CUBE/ChRIS password")
-parser.add_argument('-n', '--remoteHost', default='0.0.0.0', type=str,
-                    help='Remote Host IP')
-parser.add_argument('-p', '--remotePort', default='4242', type=str,
-                    help='Remote Host port')
-parser.add_argument('-a', '--aec', default='ChRIS', type=str,
-                    help='called AE title')
+parser.add_argument('--orthancUrl', '-o',
+                  dest='orthancUrl',
+                  type=str,
+                  optional=True,
+                  help='Orthanc server url',
+                  default='http://0.0.0.0:8042')
+
+parser.add_argument('--username', '-u',
+                  dest='username',
+                  type=str,
+                  optional=True,
+                  help='Orthanc server username',
+                  default='orthanc')
+
+parser.add_argument('--password', '-p',
+                  dest='password',
+                  type=str,
+                  optional=True,
+                  help='Orthanc server password',
+                  default='orthanc')
+
+parser.add_argument('--pushToRemote', '-r',
+                  dest='pushToRemote',
+                  type=str,
+                  optional=True,
+                  help='Remote modality',
+                  default='')
 parser.add_argument('--PACSurl', default='', type=str,
                     help='endpoint URL of pfdcm')
 parser.add_argument('--PACSname', default='MINICHRISORTHANC', type=str,
