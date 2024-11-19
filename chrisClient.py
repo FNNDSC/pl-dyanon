@@ -8,8 +8,8 @@ import json
 class ChrisClient(BaseClient):
     def __init__(self, url: str, username: str, password: str):
         self.cl = client.Client(url, username, password)
-        self.cl.pacs_series_url = "http://localhost:8000/api/v1/pacs/series/"
-        self.req = PACSClient(username,password)
+        self.cl.pacs_series_url = f"{url}pacs/series/"
+        self.req = PACSClient(self.cl.pacs_series_url,username,password)
 
     def create_con(self,params:dict):
         return self.cl

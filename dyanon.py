@@ -13,6 +13,7 @@ from chrisClient import ChrisClient
 import pfdcm
 import sys
 import time
+import os
 
 LOG = logger.debug
 
@@ -27,7 +28,7 @@ logger_format = (
 logger.remove()
 logger.add(sys.stderr, format=logger_format)
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 DISPLAY_TITLE = r"""
        _           _                               
@@ -154,7 +155,7 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
 
         for d_job in l_job:
             d_job["send"] = {
-                "url" : options.orthancUrl,
+                "url"      : options.orthancUrl,
                 "username" : options.username,
                 "password" : options.password,
                 "aec"      : options.pushToRemote
@@ -196,6 +197,12 @@ def health_check(options) -> bool:
     """
     check if connections to pfdcm, orthanc, and CUBE is valid
     """
+    try:
+        if not options.pluginInstanceID:
+            options.pluginInstanceID = os.environ['CHRIS_PREV_PLG_INST_ID']
+    except Exception as ex:
+        LOG(ex)
+        return False
     try:
         # create connection object
         cube_con = ChrisClient(options.CUBEurl, options.CUBEuser, options.CUBEpassword)

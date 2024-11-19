@@ -3,14 +3,14 @@ from chrisclient import request
 
 
 class PACSClient(object):
-    def __init__(self, username: str, password: str):
+    def __init__(self, url: str, username: str, password: str):
         self.cl = request.Request(username, password)
-        self.pacs_series_url = "http://localhost:8000/api/v1/pacs/series/search/"
+        self.pacs_series_search_url = f"{url}search/"
 
 
     def get_pacs_files(self, params: dict):
         l_dir_path = set()
-        resp = self.cl.get(self.pacs_series_url,params)
+        resp = self.cl.get(self.pacs_series_search_url,params)
         for item in resp.items:
             for link in item.links:
                 folder = self.cl.get(link.href)
