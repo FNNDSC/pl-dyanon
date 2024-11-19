@@ -171,12 +171,11 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
                 # register DICOMs using pfdcm
                 response = pfdcm.register_pacsfiles(autofill_directive, options.PACSurl, options.PACSname)
                 d_response = json.loads(response.text)
-                LOG(d_response)
+
 
                 # status for DICOMs in PACS
                 search_response = pfdcm.get_pfdcm_status(autofill_directive, options.PACSurl, options.PACSname)
                 d_s_resp = json.loads(search_response.text)
-                LOG(d_s_resp)
 
                 # create connection object
                 cube_con = ChrisClient(options.CUBEurl,options.CUBEuser, options.CUBEpassword)
