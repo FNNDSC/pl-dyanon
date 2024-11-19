@@ -16,3 +16,7 @@ class BaseClient(ABC):
     @abstractmethod
     def pacs_push(self):
         pass
+
+    @abstractmethod
+    def health_check(self):
+        pass

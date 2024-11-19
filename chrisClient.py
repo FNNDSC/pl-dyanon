@@ -14,6 +14,9 @@ class ChrisClient(BaseClient):
     def create_con(self,params:dict):
         return self.cl
 
+    def health_check(self):
+        return self.cl.get_chris_instance()
+
     def pacs_pull(self):
         pass
     def pacs_push(self):

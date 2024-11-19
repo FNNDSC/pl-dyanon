@@ -18,6 +18,15 @@ logger_format = (
 logger.remove()
 logger.add(sys.stderr, format=logger_format)
 
+def health_check(url: str):
+    pfdcm_about_api = f'{url}about/'
+    headers = {'Content-Type': 'application/json', 'accept': 'application/json'}
+    try:
+        response = requests.get(pfdcm_about_api, headers=headers)
+        return response
+    except Exception as er:
+        raise Exception("Connection to pfdcm could not be established.")
+
 
 def sanitize(directive: dict) -> (dict, dict):
     """
@@ -84,7 +93,7 @@ def register_pacsfiles(directive: dict, url: str, pacs_name: str):
         response = requests.post(pfdcm_dicom_api, json=body, headers=headers)
         return response
     except Exception as er:
-        print(er)
+        LOG(er)
 
 
 def get_pfdcm_status(directive: dict, url: str, pacs_name: str):

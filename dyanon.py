@@ -27,7 +27,7 @@ logger_format = (
 logger.remove()
 logger.add(sys.stderr, format=logger_format)
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 DISPLAY_TITLE = r"""
        _           _                               
@@ -144,6 +144,8 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
     #
     # Refer to the documentation for more options, examples, and advanced uses e.g.
     # adding a progress bar and parallelism.
+    if not health_check(options): return
+
     mapper = PathMapper.file_mapper(inputdir, outputdir, glob=options.pattern)
     for input_file, output_file in mapper:
 
@@ -172,11 +174,6 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
                 response = pfdcm.register_pacsfiles(autofill_directive, options.PACSurl, options.PACSname)
                 d_response = json.loads(response.text)
 
-
-                # status for DICOMs in PACS
-                search_response = pfdcm.get_pfdcm_status(autofill_directive, options.PACSurl, options.PACSname)
-                d_s_resp = json.loads(search_response.text)
-
                 # create connection object
                 cube_con = ChrisClient(options.CUBEurl,options.CUBEuser, options.CUBEpassword)
 
@@ -194,6 +191,25 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
 
 if __name__ == '__main__':
     main()
+
+def health_check(options) -> bool:
+    """
+    check if connections to pfdcm, orthanc, and CUBE is valid
+    """
+    try:
+        # create connection object
+        cube_con = ChrisClient(options.CUBEurl, options.CUBEuser, options.CUBEpassword)
+        cube_con.health_check()
+    except Exception as ex:
+        LOG(ex)
+        return False
+    try:
+        # pfdcm health check
+        pfdcm.health_check(options.PACSurl)
+    except Exception as ex:
+        LOG(ex)
+        return False
+    return True
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
 def create_query(df: pd.DataFrame, str_srch_idx: str, str_anon_idx: str):
