@@ -43,9 +43,7 @@ DISPLAY_TITLE = r"""
 """
 
 
-parser = ArgumentParser(description='!!!CHANGE ME!!! An example ChRIS plugin which '
-                                    'counts the number of occurrences of a given '
-                                    'word in text files.',
+parser = ArgumentParser(description='A ChRIS plugin to dynamically anonymize DICOMs in bulk',
                         formatter_class=ArgumentDefaultsHelpFormatter)
 
 parser.add_argument('-V', '--version', action='version',
