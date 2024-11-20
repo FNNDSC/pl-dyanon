@@ -14,6 +14,7 @@ import pfdcm
 import sys
 import time
 import os
+import concurrent.futures
 
 LOG = logger.debug
 
@@ -28,7 +29,7 @@ logger_format = (
 logger.remove()
 logger.add(sys.stderr, format=logger_format)
 
-__version__ = '1.0.2'
+__version__ = '1.0.3'
 
 DISPLAY_TITLE = r"""
        _           _                               
@@ -99,6 +100,13 @@ parser.add_argument('--pushToRemote', '-r',
                   type=str,
                   help='Remote modality',
                   default='')
+parser.add_argument(
+    "--thread",
+    help="use threading to branch in parallel",
+    dest="thread",
+    action="store_true",
+    default=False,
+)
 parser.add_argument('--PACSurl', default='', type=str,
                     help='endpoint URL of pfdcm')
 parser.add_argument('--PACSname', default='MINICHRISORTHANC', type=str,
@@ -152,46 +160,55 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
 
         df = pd.read_csv(input_file,dtype=str)
         l_job = create_query(df, options.searchIdx, options.anonIdx)
-
-        for d_job in l_job:
-            d_job["send"] = {
-                "url"      : options.orthancUrl,
-                "username" : options.username,
-                "password" : options.password,
-                "aec"      : options.pushToRemote
-
-            }
-            LOG(d_job)
-
-            search_dir, _ = pfdcm.sanitize(d_job["search"])
-
-            # search for DICOMs in PACS
-            search_response = pfdcm.get_pfdcm_status(search_dir, options.PACSurl, options.PACSname)
-            autofill_directive, count = pfdcm.autocomplete_directive(d_job["search"], search_response)
-            LOG(f"{count} files found matching in PACS")
-            if count > 0:
-
-                # register DICOMs using pfdcm
-                response = pfdcm.register_pacsfiles(autofill_directive, options.PACSurl, options.PACSname)
-                d_response = json.loads(response.text)
-
-                # create connection object
-                cube_con = ChrisClient(options.CUBEurl,options.CUBEuser, options.CUBEpassword)
-
-                # verify registration
-                series = cube_con.cl.get_pacs_series_list(autofill_directive)
-                while not series['total'] > 0:
-                    LOG("waiting for registration")
-                    time.sleep(2)
-                    series = cube_con.cl.get_pacs_series_list(autofill_directive)
-
-                d_job["search"] = autofill_directive
-                cube_con.anonymize(d_job, options.pluginInstanceID)
-
+        if int(options.thread):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(os.sched_getaffinity(0))) as executor:
+                results: Iterator = executor.map(lambda t: register_and_anonymize(options, t), l_job)
+        else:
+            for d_job in l_job:
+                register_and_anonymize(options,d_job)
 
 
 if __name__ == '__main__':
     main()
+
+
+def register_and_anonymize(options: Namespace, d_job: dict):
+    """
+    1) Search through PACS for series and register in CUBE
+    2) Run anonymize and push workflow on the registered series
+    """
+    d_job["send"] = {
+        "url": options.orthancUrl,
+        "username": options.username,
+        "password": options.password,
+        "aec": options.pushToRemote
+    }
+    LOG(d_job)
+
+    search_dir, _ = pfdcm.sanitize(d_job["search"])
+
+    # search for DICOMs in PACS
+    search_response = pfdcm.get_pfdcm_status(search_dir, options.PACSurl, options.PACSname)
+    autofill_directive, count = pfdcm.autocomplete_directive(d_job["search"], search_response)
+    LOG(f"{count} files found matching in PACS")
+    if count > 0:
+
+        # register DICOMs using pfdcm
+        response = pfdcm.register_pacsfiles(autofill_directive, options.PACSurl, options.PACSname)
+        d_response = json.loads(response.text)
+
+        # create connection object
+        cube_con = ChrisClient(options.CUBEurl, options.CUBEuser, options.CUBEpassword)
+
+        # verify registration
+        series = cube_con.cl.get_pacs_series_list(autofill_directive)
+        while not series['total'] > 0:
+            LOG("waiting for registration")
+            time.sleep(2)
+            series = cube_con.cl.get_pacs_series_list(autofill_directive)
+
+        d_job["search"] = autofill_directive
+        cube_con.anonymize(d_job, options.pluginInstanceID)
 
 def health_check(options) -> bool:
     """
