@@ -105,6 +105,13 @@ parser.add_argument(
     action="store_true",
     default=False,
 )
+parser.add_argument(
+    "--wait",
+    help="wait for nodes to reach finished state",
+    dest="wait",
+    action="store_true",
+    default=False,
+)
 parser.add_argument('--PACSurl', default='', type=str,
                     help='endpoint URL of pfdcm')
 parser.add_argument('--PACSname', default='MINICHRISORTHANC', type=str,
@@ -160,7 +167,10 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
         l_job = create_query(df, options.searchIdx, options.anonIdx)
         if int(options.thread):
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(os.sched_getaffinity(0))) as executor:
-                results: Iterator = executor.map(lambda t: register_and_anonymize(options, t), l_job)
+                results: Iterator = executor.map(lambda t: register_and_anonymize(options, t,options.wait), l_job)
+
+            # Wait for all tasks to complete
+            executor.shutdown(wait=True)
         else:
             for d_job in l_job:
                 register_and_anonymize(options,d_job)
@@ -170,7 +180,7 @@ if __name__ == '__main__':
     main()
 
 
-def register_and_anonymize(options: Namespace, d_job: dict):
+def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = False):
     """
     1) Search through PACS for series and register in CUBE
     2) Run anonymize and push workflow on the registered series
@@ -179,7 +189,8 @@ def register_and_anonymize(options: Namespace, d_job: dict):
         "url": options.orthancUrl,
         "username": options.username,
         "password": options.password,
-        "aec": options.pushToRemote
+        "aec": options.pushToRemote,
+        "wait": wait
     }
     LOG(d_job)
 

@@ -4,6 +4,7 @@ from base_client import BaseClient
 from chrisclient import client
 from chris_pacs_service import PACSClient
 import json
+import time
 
 class ChrisClient(BaseClient):
     def __init__(self, url: str, username: str, password: str):
@@ -45,7 +46,23 @@ class ChrisClient(BaseClient):
             "password": params["send"]["password"],
             "pushToRemote": params["send"]["aec"]
         }
-        self.__create_feed(pl_dcm_id, dir_send_data)
+        pl_inst_id = self.__create_feed(pl_dcm_id, dir_send_data)
+        if params["send"]["wait"]:
+            self.__wait_for_node(pl_inst_id)
+
+    def __wait_for_node(self,pl_inst_id):
+        """
+        Wait for a node to transition to a finishedState
+        """
+        response = self.cl.get_plugin_instance_by_id(pl_inst_id)
+        poll_count = 0
+        total_polls = 50
+        wait_poll = 5
+        while 'finished' not in response['status'] and poll_count <= total_polls:
+            response = self.cl.get_plugin_instance_by_id(pl_inst_id)
+            time.sleep(wait_poll)
+            poll_count += 1
+
 
 
     def __create_feed(self, plugin_id: str,params: dict):
