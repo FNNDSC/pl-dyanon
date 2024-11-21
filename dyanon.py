@@ -29,7 +29,7 @@ logger_format = (
 logger.remove()
 logger.add(sys.stderr, format=logger_format)
 
-__version__ = '1.0.3'
+__version__ = '1.0.5'
 
 DISPLAY_TITLE = r"""
        _           _                               
@@ -194,17 +194,23 @@ def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = False):
     }
     LOG(d_job)
 
+    # sanitize method basically remove any tags containing Name or Description
+    # because pfdcm doesn't allow us to search PACS using partial text but
+    # this plugin allows users to do so.
     search_dir, _ = pfdcm.sanitize(d_job["search"])
 
     # search for DICOMs in PACS
     search_response = pfdcm.get_pfdcm_status(search_dir, options.PACSurl, options.PACSname)
+
+    # autocomplete method uses partial text to match with response from pfdcm status and
+    # updates the search directive with SeriesInstanceUID and StudyInstanceUID
     autofill_directive, count = pfdcm.autocomplete_directive(d_job["search"], search_response)
     LOG(f"{count} files found matching in PACS")
     if count > 0:
 
         # register DICOMs using pfdcm
         response = pfdcm.register_pacsfiles(autofill_directive, options.PACSurl, options.PACSname)
-        d_response = json.loads(response.text)
+
 
         # create connection object
         cube_con = ChrisClient(options.CUBEurl, options.CUBEuser, options.CUBEpassword)

@@ -41,27 +41,32 @@ def sanitize(directive: dict) -> (dict, dict):
             partial_directive.append({key:clone_directive.pop(key)})
     return clone_directive, dict(ChainMap(*partial_directive))
 
-def autocomplete_directive(directive: dict, response: dict) -> (dict,int):
+def autocomplete_directive(directive: dict, d_response: dict) -> (dict,int):
     """
     Autocomplete certain fields in the search directive using response
     object from pfdcm
     """
-    new_dir = copy.deepcopy(directive)
-    _,partial_directive = sanitize(directive)
+    search_directive,partial_directive = sanitize(directive)
     file_count = 0
-    d_response = json.loads(response.text)
+
+    # get the count of all matching files inside PACS
+    # we will be using this count to verify file registration
+    # in CUBE
     for l_series in d_response['pypx']['data']:
         for series in l_series["series"]:
+
             # iteratively check for all search fields and update the search record simultaneously
+            # with SeriesInstanceUID and StudyInstanceUID
             for key in directive.keys():
-                if directive[key].lower() in series[key]["value"].lower():
+                if series.get(key) and directive[key].lower() in series[key]["value"].lower():
                     partial_directive[key] = series[key]["value"]
-                    _["SeriesInstanceUID"] = series["SeriesInstanceUID"]["value"]
+                    search_directive["SeriesInstanceUID"] = series["SeriesInstanceUID"]["value"]
+                    search_directive["StudyInstanceUID"] = series["StudyInstanceUID"]["value"]
                 else:
-                    return _, file_count
+                    continue
             file_count += int(series["NumberOfSeriesRelatedInstances"]["value"])
     # _.update(partial_directive)
-    return _, file_count
+    return search_directive, file_count
 
 def register_pacsfiles(directive: dict, url: str, pacs_name: str):
     """
@@ -91,7 +96,11 @@ def register_pacsfiles(directive: dict, url: str, pacs_name: str):
 
     try:
         response = requests.post(pfdcm_dicom_api, json=body, headers=headers)
-        return response
+        d_response = json.loads(response.text)
+        if d_response['status']:
+            return d_response
+        else:
+            raise Exception(d_response['message'])
     except Exception as er:
         LOG(er)
 
@@ -125,9 +134,11 @@ def get_pfdcm_status(directive: dict, url: str, pacs_name: str):
 
     try:
         response = requests.post(pfdcm_status_url, json=body, headers=headers)
-        return response
+        d_response = json.loads(response.text)
+        if d_response['status']: return d_response
+        else: raise Exception(d_response['message'])
     except Exception as ex:
-        print(ex)
+        LOG(ex)
 
 
 

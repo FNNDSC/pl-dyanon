@@ -32,7 +32,7 @@ class ChrisClient(BaseClient):
 
         # run dircopy
         pl_id = self.__get_plugin_id({"name":"pl-dsdircopy","version":"1.0.2"})
-        pv_in_id = self.__create_feed(pl_id,{"previous_id":pv_id,'dir':dicom_dir,'title':feed_name})
+        pv_in_id = self.__create_feed(pl_id,{"previous_id":pv_id,'dir':dicom_dir})
         # run dicom_headeredit
         pl_sub_id = self.__get_plugin_id({"name":"pl-pfdicom_tagsub", "version":"3.3.4"})
         data = {"previous_id": pv_in_id, "tagStruct": anon_params, 'fileFilter': '.dcm'}
