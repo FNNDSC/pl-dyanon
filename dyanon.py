@@ -74,6 +74,7 @@ parser.add_argument(
     "--CUBEurl", default="http://localhost:8000/api/v1/", help="CUBE URL"
 )
 parser.add_argument("--CUBEuser", default="chris", help="CUBE/ChRIS username")
+parser.add_argument("--maxThreads", default=4, help="max number of parallel threads")
 parser.add_argument("--CUBEpassword", default="chris1234", help="CUBE/ChRIS password")
 parser.add_argument('--orthancUrl', '-o',
                   dest='orthancUrl',
@@ -166,7 +167,7 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
         df = pd.read_csv(input_file,dtype=str)
         l_job = create_query(df, options.searchIdx, options.anonIdx)
         if int(options.thread):
-            with concurrent.futures.ThreadPoolExecutor(max_workers=len(os.sched_getaffinity(0))) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=int(options.maxThreads)) as executor:
                 results: Iterator = executor.map(lambda t: register_and_anonymize(options, t,options.wait), l_job)
 
             # Wait for all tasks to complete
