@@ -42,12 +42,14 @@ DISPLAY_TITLE = r"""
 |_|                  |___/                         
 """
 
-
 parser = ArgumentParser(description='A ChRIS plugin to dynamically anonymize DICOMs in bulk',
                         formatter_class=ArgumentDefaultsHelpFormatter)
 
-parser.add_argument('-V', '--version', action='version',
-                    version=f'%(prog)s {__version__}')
+parser.add_argument(
+    '-V', '--version',
+    action='version',
+    version=f'%(prog)s {__version__}'
+)
 parser.add_argument(
     "--pattern",
     default="**/*csv",
@@ -71,34 +73,56 @@ parser.add_argument(
     help="comma separated indices of columns containing anonymization data",
 )
 parser.add_argument(
-    "--CUBEurl", default="http://localhost:8000/api/v1/", help="CUBE URL"
+    "--CUBEurl",
+    default="http://localhost:8000/api/v1/",
+    help="CUBE URL"
 )
-parser.add_argument("--CUBEuser", default="chris", help="CUBE/ChRIS username")
-parser.add_argument("--maxThreads", default=4, help="max number of parallel threads")
-parser.add_argument("--CUBEpassword", default="chris1234", help="CUBE/ChRIS password")
-parser.add_argument('--orthancUrl', '-o',
-                  dest='orthancUrl',
-                  type=str,
-                  help='Orthanc server url',
-                  default='http://0.0.0.0:8042')
+parser.add_argument(
+    "--CUBEuser",
+    default="chris",
+    help="CUBE/ChRIS username"
+)
+parser.add_argument(
+    "--maxThreads",
+    default=4,
+    help="max number of parallel threads"
+)
+parser.add_argument(
+    "--CUBEpassword",
+    default="chris1234",
+    help="CUBE/ChRIS password"
+)
+parser.add_argument(
+    '--orthancUrl', '-o',
+    dest='orthancUrl',
+    type=str,
+    help='Orthanc server url',
+    default='http://0.0.0.0:8042'
+)
 
-parser.add_argument('--orthancUsername', '-u',
-                  dest='username',
-                  type=str,
-                  help='Orthanc server username',
-                  default='orthanc')
+parser.add_argument(
+    '--orthancUsername', '-u',
+    dest='username',
+    type=str,
+    help='Orthanc server username',
+    default='orthanc'
+)
 
-parser.add_argument('--orthancPassword', '-p',
-                  dest='password',
-                  type=str,
-                  help='Orthanc server password',
-                  default='orthanc')
+parser.add_argument(
+    '--orthancPassword', '-p',
+    dest='password',
+    type=str,
+    help='Orthanc server password',
+    default='orthanc'
+)
 
-parser.add_argument('--pushToRemote', '-r',
-                  dest='pushToRemote',
-                  type=str,
-                  help='Remote modality',
-                  default='')
+parser.add_argument(
+    '--pushToRemote', '-r',
+    dest='pushToRemote',
+    type=str,
+    help='Remote modality',
+    default=''
+)
 parser.add_argument(
     "--thread",
     help="use threading to branch in parallel",
@@ -113,10 +137,18 @@ parser.add_argument(
     action="store_true",
     default=False,
 )
-parser.add_argument('--PACSurl', default='', type=str,
-                    help='endpoint URL of pfdcm')
-parser.add_argument('--PACSname', default='MINICHRISORTHANC', type=str,
-                    help='name of the PACS')
+parser.add_argument(
+    '--PACSurl',
+    default='',
+    type=str,
+    help='endpoint URL of pfdcm'
+)
+parser.add_argument(
+    '--PACSname',
+    default='MINICHRISORTHANC',
+    type=str,
+    help='name of the PACS'
+)
 parser.add_argument(
     "--pftelDB",
     help="an optional pftel telemetry logger, of form '<pftelURL>/api/v1/<object>/<collection>/<event>'",
@@ -131,10 +163,10 @@ parser.add_argument(
 @chris_plugin(
     parser=parser,
     title='A dynamic anonymization ChRIS plugin',
-    category='',                 # ref. https://chrisstore.co/plugins
-    min_memory_limit='100Mi',    # supported units: Mi, Gi
-    min_cpu_limit='1000m',       # millicores, e.g. "1000m" = 1 CPU core
-    min_gpu_limit=0              # set min_gpu_limit=1 to enable GPU
+    category='',  # ref. https://chrisstore.co/plugins
+    min_memory_limit='100Mi',  # supported units: Mi, Gi
+    min_cpu_limit='1000m',  # millicores, e.g. "1000m" = 1 CPU core
+    min_gpu_limit=0  # set min_gpu_limit=1 to enable GPU
 )
 @pflog.tel_logTime(
     event="dyanon", log="Dynamic Anonymization of DICOMs"
@@ -164,17 +196,17 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
     mapper = PathMapper.file_mapper(inputdir, outputdir, glob=options.pattern)
     for input_file, output_file in mapper:
 
-        df = pd.read_csv(input_file,dtype=str)
+        df = pd.read_csv(input_file, dtype=str)
         l_job = create_query(df, options.searchIdx, options.anonIdx)
         if int(options.thread):
             with concurrent.futures.ThreadPoolExecutor(max_workers=int(options.maxThreads)) as executor:
-                results: Iterator = executor.map(lambda t: register_and_anonymize(options, t,options.wait), l_job)
+                results: Iterator = executor.map(lambda t: register_and_anonymize(options, t, options.wait), l_job)
 
             # Wait for all tasks to complete
             executor.shutdown(wait=True)
         else:
             for d_job in l_job:
-                register_and_anonymize(options,d_job)
+                register_and_anonymize(options, d_job)
 
 
 if __name__ == '__main__':
@@ -212,7 +244,6 @@ def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = False):
         # register DICOMs using pfdcm
         response = pfdcm.register_pacsfiles(autofill_directive, options.PACSurl, options.PACSname)
 
-
         # create connection object
         cube_con = ChrisClient(options.CUBEurl, options.CUBEuser, options.CUBEpassword)
 
@@ -225,6 +256,7 @@ def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = False):
 
         d_job["search"] = autofill_directive
         cube_con.anonymize(d_job, options.pluginInstanceID)
+
 
 def health_check(options) -> bool:
     """
@@ -251,10 +283,11 @@ def health_check(options) -> bool:
         return False
     return True
 
+
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
 def create_query(df: pd.DataFrame, str_srch_idx: str, str_anon_idx: str):
-    l_srch_idx = list(map(int,str_srch_idx.split(',')))
-    l_anon_idx = list(map(int,str_anon_idx.split(',')))
+    l_srch_idx = list(map(int, str_srch_idx.split(',')))
+    l_anon_idx = list(map(int, str_anon_idx.split(',')))
 
     l_job = []
 
@@ -266,14 +299,11 @@ def create_query(df: pd.DataFrame, str_srch_idx: str, str_anon_idx: str):
         s_d = [{k: v} for k, v in zip(s_col, s_row)]
         d_job["search"] = dict(ChainMap(*s_d))
 
-        a_col=(df.columns[l_anon_idx].values)
-        a_row=(row[1].iloc[l_anon_idx].values)
-        a_d = [{k.split('.')[0]:v} for k,v in zip(a_col,a_row)]
+        a_col = (df.columns[l_anon_idx].values)
+        a_row = (row[1].iloc[l_anon_idx].values)
+        a_d = [{k.split('.')[0]: v} for k, v in zip(a_col, a_row)]
         d_job["anon"] = dict(ChainMap(*a_d))
 
         l_job.append(d_job)
 
     return l_job
-
-
-
