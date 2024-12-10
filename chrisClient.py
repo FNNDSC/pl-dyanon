@@ -25,19 +25,26 @@ class ChrisClient(BaseClient):
 
     def anonymize(self, params: dict, pv_id: int):
         prefix = "dynanon"
+        pl_px_qy_id = self.__get_plugin_id({"name": "pl-pacs_query", "version": "1.0.1"})
+        pl_px_rt_id = self.__get_plugin_id({"name": "pl-pacs_retrieve", "version": "1.0.1"})
+        pl_rg_ch_id = self.__get_plugin_id({"name": "pl-reg_chxr", "version": "1.0.1"})
+        pl_id = self.__get_plugin_id({"name": "pl-dsdircopy", "version": "1.0.2"})
+        pl_sub_id = self.__get_plugin_id({"name": "pl-pfdicom_tagsub", "version": "3.3.4"})
+        pl_dcm_id = self.__get_plugin_id({"name": "pl-orthanc_push", "version": "1.2.7"})
+
         feed_name = self.__create_feed_name(prefix,params["search"])
         # search for dicom dir
         dicom_dir = self.req.get_pacs_files(params["search"])
         anon_params = json.dumps(params["anon"])
 
         # run dircopy
-        pl_id = self.__get_plugin_id({"name":"pl-dsdircopy","version":"1.0.2"})
+
         pv_in_id = self.__create_feed(pl_id,{"previous_id":pv_id,'dir':dicom_dir})
         # run dicom_headeredit
-        pl_sub_id = self.__get_plugin_id({"name":"pl-pfdicom_tagsub", "version":"3.3.4"})
+
         data = {"previous_id": pv_in_id, "tagStruct": anon_params, 'fileFilter': '.dcm'}
         tag_sub_id = self.__create_feed(pl_sub_id, data)
-        pl_dcm_id = self.__get_plugin_id({"name":"pl-orthanc_push", "version":"1.2.7"})
+
         dir_send_data = {
             "previous_id": tag_sub_id,
             'inputFileFilter': "**/*dcm",
