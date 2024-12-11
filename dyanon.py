@@ -218,7 +218,11 @@ def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = False):
     1) Search through PACS for series and register in CUBE
     2) Run anonymize and push workflow on the registered series
     """
-    d_job["send"] = {
+    d_job["pull"] = {
+        "url": options.PACSurl,
+        "pacs": options.PACSname
+    }
+    d_job["push"] = {
         "url": options.orthancUrl,
         "username": options.username,
         "password": options.password,
@@ -226,36 +230,8 @@ def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = False):
         "wait": wait
     }
     LOG(d_job)
-
-    # sanitize method basically remove any tags containing Name or Description
-    # because pfdcm doesn't allow us to search PACS using partial text but
-    # this plugin allows users to do so.
-    search_dir, _ = pfdcm.sanitize(d_job["search"])
-
-    # search for DICOMs in PACS
-    search_response = pfdcm.get_pfdcm_status(search_dir, options.PACSurl, options.PACSname)
-
-    # autocomplete method uses partial text to match with response from pfdcm status and
-    # updates the search directive with SeriesInstanceUID and StudyInstanceUID
-    autofill_directive, count = pfdcm.autocomplete_directive(d_job["search"], search_response)
-    LOG(f"{count} files found matching in PACS")
-    if count > 0:
-
-        # register DICOMs using pfdcm
-        response = pfdcm.register_pacsfiles(autofill_directive, options.PACSurl, options.PACSname)
-
-        # create connection object
-        cube_con = ChrisClient(options.CUBEurl, options.CUBEuser, options.CUBEpassword)
-
-        # verify registration
-        series = cube_con.cl.get_pacs_series_list(autofill_directive)
-        while not series['total'] > 0:
-            LOG("waiting for registration")
-            time.sleep(2)
-            series = cube_con.cl.get_pacs_series_list(autofill_directive)
-
-        d_job["search"] = autofill_directive
-        cube_con.anonymize(d_job, options.pluginInstanceID)
+    cube_con = ChrisClient(options.CUBEurl, options.CUBEuser, options.CUBEpassword)
+    cube_con.anonymize(d_job, options.pluginInstanceID)
 
 
 def health_check(options) -> bool:
