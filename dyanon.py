@@ -29,7 +29,7 @@ logger_format = (
 logger.remove()
 logger.add(sys.stderr, format=logger_format)
 
-__version__ = '1.0.5'
+__version__ = '1.0.6'
 
 DISPLAY_TITLE = r"""
        _           _                               
@@ -203,7 +203,7 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
                 results: Iterator = executor.map(lambda t: register_and_anonymize(options, t, options.wait), l_job)
 
             # Wait for all tasks to complete
-            executor.shutdown(wait=True)
+            # executor.shutdown(wait=True)
         else:
             for d_job in l_job:
                 register_and_anonymize(options, d_job)

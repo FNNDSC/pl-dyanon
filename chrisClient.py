@@ -42,10 +42,10 @@ class ChrisClient(BaseClient):
         prefix = "dynanon"
         pl_px_qy_id = self.__get_plugin_id({"name": "pl-pacs_query", "version": "1.0.3"})
         pl_px_rt_id = self.__get_plugin_id({"name": "pl-pacs_retrieve", "version": "1.0.2"})
-        pl_rg_ch_id = self.__get_plugin_id({"name": "pl-reg_chxr", "version": "1.0.2"})
-        pl_id = self.__get_plugin_id({"name": "pl-dsdircopy", "version": "1.0.2"})
-        pl_sub_id = self.__get_plugin_id({"name": "pl-pfdicom_tagsub", "version": "3.3.4"})
-        pl_dcm_id = self.__get_plugin_id({"name": "pl-orthanc_push", "version": "1.2.7"})
+        pl_rg_ch_id = self.__get_plugin_id({"name": "pl-reg_chxr", "version": "1.0.7"})
+        # pl_id = self.__get_plugin_id({"name": "pl-dsdircopy", "version": "1.0.2"})
+        # pl_sub_id = self.__get_plugin_id({"name": "pl-pfdicom_tagsub", "version": "3.3.4"})
+        # pl_dcm_id = self.__get_plugin_id({"name": "pl-orthanc_push", "version": "1.2.7"})
 
         # 1) Run PACS query
         px_qy_params = {"PACSurl": params["pull"]["url"],
@@ -64,38 +64,45 @@ class ChrisClient(BaseClient):
                         }
         px_rt_inst_id = self.__create_feed(pl_px_rt_id, px_rt_params)
 
-        # 3) Verify registration
+        # 3) Verify registration and run anonymize and push
+        anon_params = json.dumps(params["anon"])
         rg_ch_params = {"CUBEurl": self.cl.url,
                         "CUBEuser": self.cl.username,
                         "CUBEpassword": self.cl.password,
                         "inputJSONfile": "search_results.json",
+                        "tagStruct": anon_params,
+                        "orthancUrl": params["push"]["url"],
+                        "username": params["push"]["username"],
+                        "password": params["push"]["password"],
+                        "pushToRemote": params["push"]["aec"],
                         "previous_id": px_rt_inst_id}
         rg_ch_inst_id = self.__create_feed(pl_rg_ch_id, rg_ch_params)
-
-        # 4) Run dircopy
-        dicom_dir = self.req.get_pacs_files(params["search"])
-
-        # empty directory check
-        if len(dicom_dir) == 0:
-            LOG(f"No directory found in CUBE containing files for search : {params['search']}")
-            return
-        pv_in_id = self.__create_feed(pl_id, {"previous_id": rg_ch_inst_id, 'dir': dicom_dir})
-
-        # 5) Run anonymization
-        anon_params = json.dumps(params["anon"])
-        data = {"previous_id": pv_in_id, "tagStruct": anon_params, 'fileFilter': '.dcm'}
-        tag_sub_id = self.__create_feed(pl_sub_id, data)
-
-        # 6) Push results
-        dir_send_data = {
-            "previous_id": tag_sub_id,
-            'inputFileFilter': "**/*dcm",
-            "orthancUrl": params["push"]["url"],
-            "username":params["push"]["username"],
-            "password": params["push"]["password"],
-            "pushToRemote": params["push"]["aec"]
-        }
-        pl_inst_id = self.__create_feed(pl_dcm_id, dir_send_data)
+        # self.__wait_for_node(rg_ch_inst_id)
+        #
+        # # 4) Run dircopy
+        # dicom_dir = self.req.get_pacs_files(params["search"])
+        #
+        # # empty directory check
+        # if len(dicom_dir) == 0:
+        #     LOG(f"No directory found in CUBE containing files for search : {params['search']}")
+        #     return
+        # pv_in_id = self.__create_feed(pl_id, {"previous_id": rg_ch_inst_id, 'dir': dicom_dir})
+        #
+        # # 5) Run anonymization
+        # anon_params = json.dumps(params["anon"])
+        # data = {"previous_id": pv_in_id, "tagStruct": anon_params, 'fileFilter': '.dcm'}
+        # tag_sub_id = self.__create_feed(pl_sub_id, data)
+        #
+        # # 6) Push results
+        # dir_send_data = {
+        #     "previous_id": tag_sub_id,
+        #     'inputFileFilter': "**/*dcm",
+        #     "orthancUrl": params["push"]["url"],
+        #     "username":params["push"]["username"],
+        #     "password": params["push"]["password"],
+        #     "pushToRemote": params["push"]["aec"]
+        # }
+        # pl_inst_id = self.__create_feed(pl_dcm_id, dir_send_data)
 
         # feed_name = self.__create_feed_name(prefix,params["search"])
         # # search for dicom dir
@@ -134,8 +141,6 @@ class ChrisClient(BaseClient):
             response = self.cl.get_plugin_instance_by_id(pl_inst_id)
             time.sleep(wait_poll)
             poll_count += 1
-
-
 
     def __create_feed(self, plugin_id: str,params: dict):
         response = self.cl.create_plugin_instance(plugin_id, params)
