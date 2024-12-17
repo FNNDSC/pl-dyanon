@@ -93,33 +93,25 @@ parser.add_argument(
     help="CUBE/ChRIS password"
 )
 parser.add_argument(
-    '--orthancUrl', '-o',
-    dest='orthancUrl',
-    type=str,
+    '--orthancUrl',
     help='Orthanc server url',
     default='http://0.0.0.0:8042'
 )
 
 parser.add_argument(
-    '--orthancUsername', '-u',
-    dest='username',
-    type=str,
+    '--orthancUsername',
     help='Orthanc server username',
     default='orthanc'
 )
 
 parser.add_argument(
-    '--orthancPassword', '-p',
-    dest='password',
-    type=str,
+    '--orthancPassword',
     help='Orthanc server password',
     default='orthanc'
 )
 
 parser.add_argument(
-    '--pushToRemote', '-r',
-    dest='pushToRemote',
-    type=str,
+    '--pushToRemote',
     help='Remote modality',
     default=''
 )
@@ -224,8 +216,8 @@ def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = False):
     }
     d_job["push"] = {
         "url": options.orthancUrl,
-        "username": options.username,
-        "password": options.password,
+        "username": options.orthancUsername,
+        "password": options.orthancPassword,
         "aec": options.pushToRemote,
         "wait": wait
     }
