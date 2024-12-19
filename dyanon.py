@@ -183,6 +183,8 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
     #
     # Refer to the documentation for more options, examples, and advanced uses e.g.
     # adding a progress bar and parallelism.
+    log_file = os.path.join(options.outputdir, 'terminal.log')
+    logger.add(log_file)
     if not health_check(options): return
 
     mapper = PathMapper.file_mapper(inputdir, outputdir, glob=options.pattern)
