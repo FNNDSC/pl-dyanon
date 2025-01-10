@@ -54,8 +54,8 @@ parser.add_argument(
     "--pattern",
     default="**/*csv",
     help="""
-            pattern for file names to include (you should quote this!)
-            (this flag triggers the PathMapper on the inputdir).""",
+            pattern for file names to include.
+            Default is **/*csv.""",
 )
 parser.add_argument(
     "--pluginInstanceID",
@@ -75,7 +75,7 @@ parser.add_argument(
 parser.add_argument(
     "--CUBEurl",
     default="http://localhost:8000/api/v1/",
-    help="CUBE URL"
+    help="CUBE URL. Please include api version in the url endpoint."
 )
 parser.add_argument(
     "--CUBEuser",
@@ -94,7 +94,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '--orthancUrl',
-    help='Orthanc server url',
+    help='Orthanc server url. Please include api version in the url endpoint.',
     default='http://0.0.0.0:8042'
 )
 
@@ -133,7 +133,7 @@ parser.add_argument(
     '--PACSurl',
     default='',
     type=str,
-    help='endpoint URL of pfdcm'
+    help='endpoint URL of pfdcm. Please include api version in the url endpoint.'
 )
 parser.add_argument(
     '--PACSname',
