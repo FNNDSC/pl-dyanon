@@ -29,7 +29,7 @@ logger_format = (
 logger.remove()
 logger.add(sys.stderr, format=logger_format)
 
-__version__ = '1.0.8'
+__version__ = '1.0.9'
 
 DISPLAY_TITLE = r"""
        _           _                               
@@ -61,16 +61,6 @@ parser.add_argument(
     "--pluginInstanceID",
     default="",
     help="plugin instance ID from which to start analysis",
-)
-parser.add_argument(
-    "--searchIdx",
-    default="",
-    help="comma separated indices of columns containing search data",
-)
-parser.add_argument(
-    "--anonIdx",
-    default="",
-    help="comma separated indices of columns containing anonymization data",
 )
 parser.add_argument(
     "--CUBEurl",
@@ -256,8 +246,13 @@ def health_check(options) -> bool:
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
 def create_query(df: pd.DataFrame, str_srch_idx: str, str_anon_idx: str):
-    l_srch_idx = list(map(int, str_srch_idx.split(',')))
-    l_anon_idx = list(map(int, str_anon_idx.split(',')))
+    l_srch_idx = []
+    l_anon_idx = []
+    for column in df.columns:
+        if "search" in str(column).lower():
+            l_srch_idx.append(df.columns.get_loc(column))
+        if "anon" in str(column).lower():
+            l_anon_idx.append(df.columns.get_loc(column))
 
     l_job = []
 
@@ -266,12 +261,12 @@ def create_query(df: pd.DataFrame, str_srch_idx: str, str_anon_idx: str):
 
         s_col = (df.columns[l_srch_idx].values)
         s_row = (row[1].iloc[l_srch_idx].values)
-        s_d = [{k: v} for k, v in zip(s_col, s_row)]
+        s_d = [{k.split('.')[0].split('_')[1]: v} for k, v in zip(s_col, s_row)]
         d_job["search"] = dict(ChainMap(*s_d))
 
         a_col = (df.columns[l_anon_idx].values)
         a_row = (row[1].iloc[l_anon_idx].values)
-        a_d = [{k.split('.')[0]: v} for k, v in zip(a_col, a_row)]
+        a_d = [{k.split('.')[0].split('_')[1]: v} for k, v in zip(a_col, a_row)]
         d_job["anon"] = dict(ChainMap(*a_d))
 
         l_job.append(d_job)
