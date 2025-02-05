@@ -29,7 +29,7 @@ logger_format = (
 logger.remove()
 logger.add(sys.stderr, format=logger_format)
 
-__version__ = '1.0.9'
+__version__ = '1.1.0'
 
 DISPLAY_TITLE = r"""
        _           _                               
@@ -181,7 +181,7 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
     for input_file, output_file in mapper:
 
         df = pd.read_csv(input_file, dtype=str)
-        l_job = create_query(df, options.searchIdx, options.anonIdx)
+        l_job = create_query(df)
         if int(options.thread):
             with concurrent.futures.ThreadPoolExecutor(max_workers=int(options.maxThreads)) as executor:
                 results: Iterator = executor.map(lambda t: register_and_anonymize(options, t, options.wait), l_job)
@@ -245,7 +245,7 @@ def health_check(options) -> bool:
 
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
-def create_query(df: pd.DataFrame, str_srch_idx: str, str_anon_idx: str):
+def create_query(df: pd.DataFrame):
     l_srch_idx = []
     l_anon_idx = []
     for column in df.columns:
