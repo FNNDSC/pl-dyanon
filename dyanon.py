@@ -15,6 +15,7 @@ import sys
 import time
 import os
 import concurrent.futures
+import asyncio
 
 LOG = logger.debug
 
@@ -29,7 +30,7 @@ logger_format = (
 logger.remove()
 logger.add(sys.stderr, format=logger_format)
 
-__version__ = '1.1.2'
+__version__ = '1.1.3'
 
 DISPLAY_TITLE = r"""
        _           _                               
@@ -68,19 +69,15 @@ parser.add_argument(
     help="CUBE URL. Please include api version in the url endpoint."
 )
 parser.add_argument(
-    "--CUBEuser",
-    default="chris",
-    help="CUBE/ChRIS username"
+    "--CUBEtoken",
+    default="",
+    help="CUBE/ChRIS user token"
 )
+
 parser.add_argument(
     "--maxThreads",
     default=4,
     help="max number of parallel threads"
-)
-parser.add_argument(
-    "--CUBEpassword",
-    default="chris1234",
-    help="CUBE/ChRIS password"
 )
 parser.add_argument(
     '--orthancUrl',
@@ -120,7 +117,7 @@ parser.add_argument(
     default=False,
 )
 parser.add_argument(
-    '--PACSurl',
+    '--PFDCMurl',
     default='',
     type=str,
     help='endpoint URL of pfdcm. Please include api version in the url endpoint.'
@@ -132,9 +129,16 @@ parser.add_argument(
     help='name of the PACS'
 )
 parser.add_argument(
-    "--pftelDB",
-    help="an optional pftel telemetry logger, of form '<pftelURL>/api/v1/<object>/<collection>/<event>'",
-    default="",
+    '--recipients',
+    default='',
+    type=str,
+    help='comma separated valid email recipient addresses'
+)
+parser.add_argument(
+    '--SMTPServer',
+    default='mailsmtp4.childrenshospital.org',
+    type=str,
+    help='valid email server'
 )
 
 
@@ -166,20 +170,15 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
 
     print(DISPLAY_TITLE)
 
-    # Typically it's easier to think of programs as operating on individual files
-    # rather than directories. The helper functions provided by a ``PathMapper``
-    # object make it easy to discover input files and write to output files inside
-    # the given paths.
-    #
-    # Refer to the documentation for more options, examples, and advanced uses e.g.
-    # adding a progress bar and parallelism.
     log_file = os.path.join(options.outputdir, 'terminal.log')
     logger.add(log_file)
+    LOG(f"Logs are stored in {log_file}")
+
     if not health_check(options): return
 
     mapper = PathMapper.file_mapper(inputdir, outputdir, glob=options.pattern)
     for input_file, output_file in mapper:
-
+        LOG(f"Reading input from {input_file}")
         df = pd.read_csv(input_file, dtype=str)
         l_job = create_query(df)
         if int(options.thread):
@@ -190,21 +189,25 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
             # executor.shutdown(wait=True)
         else:
             for d_job in l_job:
-                register_and_anonymize(options, d_job)
+                response = asyncio.run(register_and_anonymize(options, d_job))
 
 
 if __name__ == '__main__':
     main()
 
 
-def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = False):
+async def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = False):
     """
     1) Search through PACS for series and register in CUBE
     2) Run anonymize and push workflow on the registered series
     """
     d_job["pull"] = {
-        "url": options.PACSurl,
+        "url": options.PFDCMurl,
         "pacs": options.PACSname
+    }
+    d_job["notify"] = {
+        "recipients": options.recipients,
+        "smtp_server": options.SMTPServer
     }
     d_job["push"] = {
         "url": options.orthancUrl,
@@ -214,13 +217,13 @@ def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = False):
         "wait": wait
     }
     LOG(d_job)
-    cube_con = ChrisClient(options.CUBEurl, options.CUBEuser, options.CUBEpassword)
-    cube_con.anonymize(d_job, options.pluginInstanceID)
+    cube_con = ChrisClient(options.CUBEurl, options.CUBEtoken)
+    d_ret = await cube_con.anonymize(d_job, options.pluginInstanceID)
 
 
 def health_check(options) -> bool:
     """
-    check if connections to pfdcm, orthanc, and CUBE is valid
+    check if connections to pfdcm and CUBE is valid
     """
     try:
         if not options.pluginInstanceID:
@@ -230,19 +233,20 @@ def health_check(options) -> bool:
         return False
     try:
         # create connection object
-        cube_con = ChrisClient(options.CUBEurl, options.CUBEuser, options.CUBEpassword)
+        if not options.CUBEtoken:
+            options.CUBEtoken = os.environ['CHRIS_USER_TOKEN']
+        cube_con = ChrisClient(options.CUBEurl, options.CUBEtoken)
         cube_con.health_check()
     except Exception as ex:
         LOG(ex)
         return False
     try:
         # pfdcm health check
-        pfdcm.health_check(options.PACSurl)
+        pfdcm.health_check(options.PFDCMurl)
     except Exception as ex:
         LOG(ex)
         return False
     return True
-
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
 def create_query(df: pd.DataFrame):
