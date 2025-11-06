@@ -309,9 +309,11 @@ class Pipeline:
             updated_params = update_plugin_parameters(nodes_info, pipeline_params)
             workflow_id = self.post_workflow(pipeline_id=pipeline_id, previous_id=previous_inst, params=updated_params)
 
-            # Start this in the background (not awaited)
-            asyncio.create_task(
-                self.monitor_pipeline(workflow_id, total_jobs, previous_inst, recipients, smtp_server, search_data))
+            if recipients:
+
+                # Start this in the background (not awaited)
+                asyncio.create_task(
+                    self.monitor_pipeline(workflow_id, total_jobs, previous_inst, recipients, smtp_server, search_data))
 
             logger.info(f"Workflow posted successfully")
             return {"status": "Pipeline running"}

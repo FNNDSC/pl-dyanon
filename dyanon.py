@@ -30,7 +30,7 @@ logger_format = (
 logger.remove()
 logger.add(sys.stderr, format=logger_format)
 
-__version__ = '1.1.3'
+__version__ = '1.1.4'
 
 DISPLAY_TITLE = r"""
        _           _                               
@@ -140,7 +140,12 @@ parser.add_argument(
     type=str,
     help='valid email server'
 )
-
+parser.add_argument(
+    '--preserveTags',
+    default='',
+    type=str,
+    help='A stringified JSON of header tags from the original DICOM to keep'
+)
 
 # The main function of this *ChRIS* plugin is denoted by this ``@chris_plugin`` "decorator."
 # Some metadata about the plugin is specified here. There is more metadata specified in setup.py.
@@ -215,6 +220,9 @@ async def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = F
         "password": options.orthancPassword,
         "aec": options.pushToRemote,
         "wait": wait
+    }
+    d_job["preserve"] = {
+        "preserveTags": options.preserveTags
     }
     LOG(d_job)
     cube_con = ChrisClient(options.CUBEurl, options.CUBEtoken)

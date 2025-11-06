@@ -66,7 +66,8 @@ class ChrisClient(BaseClient):
                 "PACSname": params["pull"]["pacs"],
                 "pushToRemote": params["push"]["aec"],
                 "SMTPServer": params["notify"]["smtp_server"],
-                "recipients": params["notify"]["recipients"]
+                "recipients": params["notify"]["recipients"],
+                "preserveTags": params["preserve"]["preserveTags"]
             }
         }
         d_ret = await pipe.run_pipeline(
