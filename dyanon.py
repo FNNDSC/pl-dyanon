@@ -2,7 +2,6 @@
 
 from pathlib import Path
 from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
-from pflog import pflog
 from loguru import logger
 from chris_plugin import chris_plugin, PathMapper
 import pandas as pd
@@ -30,7 +29,7 @@ logger_format = (
 logger.remove()
 logger.add(sys.stderr, format=logger_format)
 
-__version__ = '1.1.4'
+__version__ = '1.1.5'
 
 DISPLAY_TITLE = r"""
        _           _                               
@@ -158,9 +157,6 @@ parser.add_argument(
     min_memory_limit='100Mi',  # supported units: Mi, Gi
     min_cpu_limit='1000m',  # millicores, e.g. "1000m" = 1 CPU core
     min_gpu_limit=0  # set min_gpu_limit=1 to enable GPU
-)
-@pflog.tel_logTime(
-    event="dyanon", log="Dynamic Anonymization of DICOMs"
 )
 def main(options: Namespace, inputdir: Path, outputdir: Path):
     """

@@ -234,9 +234,6 @@ class Pipeline:
         email_content = (f"An error occurred while running pacs-pull pipeline on the following data: "
                          f"\nFeed Name: {feed_details['name']}"
                          f"\nDate: {feed_details['date']}"
-                         f"\nMRN: {search_data['PatientID']} "
-                         f"\nStudyDate: {search_data['StudyDate']}"
-                         f"\nModality: {search_data['Modality']}"
                          f"\n\nKindly login to ChRIS as *{feed_details['owner']}* to access the logs for more details.")
 
         try:
