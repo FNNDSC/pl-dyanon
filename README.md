@@ -5,12 +5,21 @@
 [![ci](https://github.com/FNNDSC/pl-dyanon/actions/workflows/ci.yml/badge.svg)](https://github.com/FNNDSC/pl-dyanon/actions/workflows/ci.yml)
 
 `pl-dyanon` is a [_ChRIS_](https://chrisproject.org/)
-_ds_ plugin which takes in ...  as input files and
-creates ... as output files.
+_ds_ plugin which takes CSV-based DICOM selection and rule definition files as input and
+produces dynamically anonymized DICOM studies as output. The plugin can optionally push
+results to Orthanc, a remote PACS, or downstream ChRIS workflows.
 
 ## Abstract
 
-...
+Medical imaging workflows frequently require flexible, rule-driven anonymization that can
+adapt dynamically to different studies, projects, or data-sharing requirements.
+`pl-dyanon` enables scalable, bulk DICOM anonymization driven by external metadata,
+CSV inputs, and configurable tag-preservation rules.
+
+The plugin integrates with the ChRIS ecosystem, Orthanc servers, and optional PACS
+endpoints. It supports parallel execution, selective DICOM filtering, image-count–based
+rules, and optional email notifications upon completion.
+
 
 ## Installation
 
