@@ -145,7 +145,18 @@ parser.add_argument(
     type=str,
     help='A stringified JSON of header tags from the original DICOM to keep'
 )
-
+parser.add_argument(
+    '--dicomFilter',
+    default='',
+    type=str,
+    help='comma separated dicom tags with values'
+)
+parser.add_argument(
+    '--imgCount',
+    default='',
+    type=str,
+    help='comma separated image count filter expression.'
+)
 # The main function of this *ChRIS* plugin is denoted by this ``@chris_plugin`` "decorator."
 # Some metadata about the plugin is specified here. There is more metadata specified in setup.py.
 #
