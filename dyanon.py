@@ -231,6 +231,10 @@ async def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = F
     d_job["preserve"] = {
         "preserveTags": options.preserveTags
     }
+    d_job["filter"] = {
+        "imgCount": options.imgCount,
+        "dicomFilter": options.dicomFilter
+    }
     LOG(d_job)
     cube_con = ChrisClient(options.CUBEurl, options.CUBEtoken)
     d_ret = await cube_con.anonymize(d_job, options.pluginInstanceID)

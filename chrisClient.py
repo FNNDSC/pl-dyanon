@@ -67,7 +67,9 @@ class ChrisClient(BaseClient):
                 "pushToRemote": params["push"]["aec"],
                 "SMTPServer": params["notify"]["smtp_server"],
                 "recipients": params["notify"]["recipients"],
-                "preserveTags": params["preserve"]["preserveTags"]
+                "preserveTags": params["preserve"]["preserveTags"],
+                "imgCount": params["filter"]["imgCount"],
+                "dicomFilter": params["filter"]["dicomFilter"]
             }
         }
         d_ret = await pipe.run_pipeline(
