@@ -62,7 +62,7 @@ class ChrisClient(BaseClient):
                 "orthancUrl": params["push"]["url"],
                 "orthancUsername": params["push"]["username"],
                 "orthancPassword": params["push"]["password"],
-                "PACSurl": params["pull"]["url"],
+                "PFDCMurl": params["pull"]["url"],
                 "PACSname": params["pull"]["pacs"],
                 "pushToRemote": params["push"]["aec"],
                 "SMTPServer": params["notify"]["smtp_server"],
