@@ -231,7 +231,7 @@ class Pipeline:
         feed_id = self.get_feed_id_from_plugin_inst(pv_id)
         feed_details = self.get_feed_details_from_id(feed_id)
         search_data = json.loads(search_data)
-        email_content = (f"An error occurred while running pacs-pull pipeline on the following data: "
+        email_content = (f"An error occurred while fetching the following data from PACS: "
                          f"\nFeed Name: {feed_details['name']}"
                          f"\nDate: {feed_details['date']}"
                          f"\n\nKindly login to ChRIS as *{feed_details['owner']}* to access the logs for more details.")
