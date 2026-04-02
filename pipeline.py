@@ -150,6 +150,26 @@ class Pipeline:
 
         return feed_details
 
+    def get_workflow_leaf_node(self, workflow_id: int) -> int:
+        """
+        Given a workflow id in ChRIS, return the leaf node in the workflow
+        Logic:
+        1) Determine all plugin instance ids in the workflow
+        2) Sort and return the highest plugin instance
+        """
+        logger.info(f"Getting leaf node for workflow with ID: {workflow_id}")
+        plugin_instances = self.make_request("GET", f"/pipelines/workflows/{workflow_id}/plugininstances/")
+        plugin_instance_ids = []
+        for plugin_instance in plugin_instances:
+            for field in plugin_instance.get("data", []):
+                if field.get("name") == "id":
+                    plugin_instance_ids.append(field.get("value"))
+
+        plugin_instance_ids.sort()
+        return plugin_instance_ids[-1]
+
+
+
 
     def post_workflow(self, pipeline_id: int, previous_id: int, params: list[dict]) -> int:
         """
@@ -170,7 +190,7 @@ class Pipeline:
         """
         1. Get workflow details for a given workflow id.
         2. Check for errored jobs
-        3. return total jobs (finished + errored + cancelled)
+        3. return total jobs (finished + errored + canceled)
         """
         finished_jobs = 0
         errored_jobs = 0
@@ -183,6 +203,7 @@ class Pipeline:
 
         logger.info(f"Fetching workflow details for ID: {workflow_id}")
         response = self.make_request("GET", f"/pipelines/workflows/{workflow_id}/")
+
         for item in response:
             for field in item.get("data", []):
                 if field.get("name") == "finished_jobs":
@@ -294,9 +315,9 @@ class Pipeline:
         3. Update them
         4. Trigger the pipeline
         """
-        smtp_server = pipeline_params["verify-registration"]["SMTPServer"]
-        recipients = pipeline_params["verify-registration"]["recipients"]
-        search_data = pipeline_params["PACS-query"]["PACSdirective"]
+        smtp_server = pipeline_params.get("verify-registration", {}).get("SMTPServer")
+        recipients = pipeline_params.get("verify-registration", {}).get("recipients")
+        search_data = pipeline_params.get("PACS-query", {}).get("PACSdirective")
         search_data = json.dumps(search_data)
         try:
             pipeline_id = self.get_pipeline_id(pipeline_name)
@@ -305,6 +326,7 @@ class Pipeline:
             nodes_info = compute_workflow_nodes_info(default_params, include_all_defaults=True)
             updated_params = update_plugin_parameters(nodes_info, pipeline_params)
             workflow_id = self.post_workflow(pipeline_id=pipeline_id, previous_id=previous_inst, params=updated_params)
+            leaf_node_id = self.get_workflow_leaf_node(workflow_id)
 
             if recipients:
 
@@ -313,7 +335,7 @@ class Pipeline:
                     self.monitor_pipeline(workflow_id, total_jobs, previous_inst, recipients, smtp_server, search_data))
 
             logger.info(f"Workflow posted successfully")
-            return {"status": "Pipeline running"}
+            return {"status": "Pipeline running", "leaf_node_id": leaf_node_id}
         except Exception as ex:
             logger.error(f"Running pipeline failed due to: {ex}")
             return {"status": "Failed", "error": str(ex)}

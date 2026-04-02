@@ -4,6 +4,8 @@ from pathlib import Path
 from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
 from loguru import logger
 from chris_plugin import chris_plugin, PathMapper
+from pipeline import Pipeline
+from runnable import Runnable
 import pandas as pd
 import json
 import itertools
@@ -29,7 +31,7 @@ logger_format = (
 logger.remove()
 logger.add(sys.stderr, format=logger_format)
 
-__version__ = '1.1.6'
+__version__ = '1.1.7'
 
 DISPLAY_TITLE = r"""
        _           _                               
@@ -157,6 +159,18 @@ parser.add_argument(
     type=str,
     help='comma separated image count filter expression.'
 )
+parser.add_argument(
+    '--pipelineName',
+    default='PACS query, retrieve, and registration verification in CUBE 20241217',
+    type=str,
+    help='Name of the pipeline to run in the analysis'
+)
+parser.add_argument(
+    '--reducePipelineName',
+    default='',
+    type=str,
+    help='Name of the pipeline to run on the collected results'
+)
 # The main function of this *ChRIS* plugin is denoted by this ``@chris_plugin`` "decorator."
 # Some metadata about the plugin is specified here. There is more metadata specified in setup.py.
 #
@@ -187,28 +201,48 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
     LOG(f"Logs are stored in {log_file}")
 
     if not health_check(options): return
+    cube_con = ChrisClient(options.CUBEurl, options.CUBEtoken)
 
     mapper = PathMapper.file_mapper(inputdir, outputdir, glob=options.pattern)
     for input_file, output_file in mapper:
         LOG(f"Reading input from {input_file}")
         df = pd.read_csv(input_file, dtype=str)
         l_job = create_query(df)
+        l_leaf_node_ids = []
+        # Fan-out logic on input space -> Map
         if int(options.thread):
             with concurrent.futures.ThreadPoolExecutor(max_workers=int(options.maxThreads)) as executor:
-                results: Iterator = executor.map(lambda t: register_and_anonymize(options, t, options.wait), l_job)
+                results: Iterator = executor.map(lambda t: register_and_anonymize(options, t, cube_con, options.wait), l_job)
 
             # Wait for all tasks to complete
             # executor.shutdown(wait=True)
         else:
             for d_job in l_job:
-                response = asyncio.run(register_and_anonymize(options, d_job))
+                response = asyncio.run(register_and_anonymize(options, d_job, cube_con))
+                LOG(response)
+                l_leaf_node_ids.append(response["leaf_node_id"])
+
+        # Fan-in logic on output space -> Reduce
+        if options.reducePipelineName:
+            join_results(options, cube_con, l_leaf_node_ids)
+
 
 
 if __name__ == '__main__':
     main()
 
+def join_results(options, cube_con: ChrisClient, inst_ids: list):
+    run_obj = Runnable(options.CUBEurl, options.CUBEtoken)
+    str_instances = ",".join(map(str,inst_ids))
+    try:
+        topo_id = run_obj.run_plugin(inst_ids[0],"pl-topologicalcopy","1.0.2",{"plugininstances":str_instances})
+        pipe_obj = Pipeline(cube_con.api_base, cube_con.auth)
+        asyncio.run(pipe_obj.run_pipeline(options.reducePipelineName,topo_id,{}))
+    except Exception as ex:
+        logger.error(f"Error occurred which running topological copy : {ex}")
 
-async def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = False):
+
+async def register_and_anonymize(options: Namespace, d_job: dict,cube_con, wait: bool = False):
     """
     1) Search through PACS for series and register in CUBE
     2) Run anonymize and push workflow on the registered series
@@ -235,9 +269,12 @@ async def register_and_anonymize(options: Namespace, d_job: dict, wait: bool = F
         "imgCount": options.imgCount,
         "dicomFilter": options.dicomFilter
     }
+    d_job["pipeline"] = {
+        "name": options.pipelineName,
+    }
     LOG(d_job)
-    cube_con = ChrisClient(options.CUBEurl, options.CUBEtoken)
     d_ret = await cube_con.anonymize(d_job, options.pluginInstanceID)
+    return d_ret
 
 
 def health_check(options) -> bool:

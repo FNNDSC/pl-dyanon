@@ -74,6 +74,6 @@ class ChrisClient(BaseClient):
         }
         d_ret = await pipe.run_pipeline(
             previous_inst=pv_id,
-            pipeline_name="PACS query, retrieve, and registration verification in CUBE 20241217",
+            pipeline_name=params["pipeline"]["name"],
             pipeline_params=plugin_params)
         return d_ret
