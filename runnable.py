@@ -69,12 +69,12 @@ class Runnable:
 
         return feed_details
 
-    def run_plugin(self, pv_id: int, plugin_name: str, plugin_version: str, plugin_params: dict) -> int:
+    def run_plugin(self, pv_id: int, plugin_name: str, plugin_params: dict) -> int:
         """
         Run a plugin on a given instance id.
         """
         try:
-            plugin_id = self.get_plugin_id({"name": plugin_name, "version": plugin_version})
+            plugin_id = self.get_plugin_id({"name": plugin_name})
             plugin_params.update({"previous_id": pv_id})
             instance_id = self.create_plugin_instance(plugin_id, plugin_params)
             return int(instance_id)

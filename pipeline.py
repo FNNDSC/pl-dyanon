@@ -8,7 +8,6 @@ import time
 import asyncio
 from urllib.parse import urlencode
 
-
 def transform_plugin_data(nested_data_list: list[dict]) -> list[dict]:
     """Flatten nested plugin data into a list of dictionaries."""
     flat_data = []
@@ -150,6 +149,17 @@ class Pipeline:
 
         return feed_details
 
+    def is_plugin_successful(self, plugin_inst: int) -> bool:
+        """Check if plugin is successful"""
+        logger.info(f"Checking if plugin is successful with ID: {plugin_inst}")
+        response = self.make_request("GET", f"/plugins/instances/{plugin_inst}/")
+        status: str = ""
+        for item in response.get("data", []):
+            if item.get("name") == "status":
+                status = item.get("value")
+        return status == "finishedSuccessfully"
+
+
     def get_workflow_leaf_node(self, workflow_id: int) -> int:
         """
         Given a workflow id in ChRIS, return the leaf node in the workflow
@@ -161,14 +171,17 @@ class Pipeline:
         plugin_instances = self.make_request("GET", f"/pipelines/workflows/{workflow_id}/plugininstances/")
         plugin_instance_ids = []
         for plugin_instance in plugin_instances:
+            instance_id = None
             for field in plugin_instance.get("data", []):
                 if field.get("name") == "id":
-                    plugin_instance_ids.append(field.get("value"))
+                    instance_id = field.get("value")
+
+            # Only append IDs for successful plugins
+            if instance_id is not None:
+                plugin_instance_ids.append(instance_id)
 
         plugin_instance_ids.sort()
-        return plugin_instance_ids[-1]
-
-
+        return plugin_instance_ids[-1] if plugin_instance_ids else None
 
 
     def post_workflow(self, pipeline_id: int, previous_id: int, params: list[dict]) -> int:
@@ -239,6 +252,8 @@ class Pipeline:
                 break
             if status["finished_jobs"] >= total_jobs:
                 logger.info("Pipeline complete.")
+                leaf_node_id = self.get_workflow_leaf_node(workflow_id)
+                return leaf_node_id
                 break
             if status["total_jobs"] < total_jobs:
                 self.run_notification_plugin(pv_inst, "Nodes deleted in pipeline", rcpts, smtp, d_search_data)
@@ -331,8 +346,10 @@ class Pipeline:
             if recipients:
 
                 # Start this in the background (not awaited)
-                asyncio.create_task(
+                task = asyncio.create_task(
                     self.monitor_pipeline(workflow_id, total_jobs, previous_inst, recipients, smtp_server, search_data))
+                result = await task
+                leaf_node_id = result
 
             logger.info(f"Workflow posted successfully")
             return {"status": "Pipeline running", "leaf_node_id": leaf_node_id}

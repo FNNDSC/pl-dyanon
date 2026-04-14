@@ -17,7 +17,7 @@ import time
 import os
 import concurrent.futures
 import asyncio
-
+import requests
 LOG = logger.debug
 
 logger_format = (
@@ -171,6 +171,12 @@ parser.add_argument(
     type=str,
     help='Name of the pipeline to run on the collected results'
 )
+parser.add_argument(
+    '--reduceFilter',
+    default='',
+    type=str,
+    help='Filter the output on file type before joining'
+)
 # The main function of this *ChRIS* plugin is denoted by this ``@chris_plugin`` "decorator."
 # Some metadata about the plugin is specified here. There is more metadata specified in setup.py.
 #
@@ -220,10 +226,11 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
             for d_job in l_job:
                 response = asyncio.run(register_and_anonymize(options, d_job, cube_con))
                 LOG(response)
-                l_leaf_node_ids.append(response["leaf_node_id"])
+                if response.get("leaf_node_id") is not None:
+                    l_leaf_node_ids.append(response["leaf_node_id"])
 
         # Fan-in logic on output space -> Reduce
-        if options.reducePipelineName:
+        if l_leaf_node_ids and options.reducePipelineName:
             join_results(options, cube_con, l_leaf_node_ids)
 
 
@@ -232,10 +239,18 @@ if __name__ == '__main__':
     main()
 
 def join_results(options, cube_con: ChrisClient, inst_ids: list):
+    logger.info(f"Joining plugin instances: {inst_ids}")
     run_obj = Runnable(options.CUBEurl, options.CUBEtoken)
     str_instances = ",".join(map(str,inst_ids))
+    filters = []
+    for inst_id in inst_ids:
+        filters.append(f"{options.reduceFilter}")
+    str_filters = ",".join(filters)
     try:
-        topo_id = run_obj.run_plugin(inst_ids[0],"pl-topologicalcopy","1.0.2",{"plugininstances":str_instances})
+        topo_id = run_obj.run_plugin(inst_ids[0],"pl-topologicalcopy",{
+            "plugininstances":str_instances,
+            "filter":str_filters,
+        })
         pipe_obj = Pipeline(cube_con.api_base, cube_con.auth)
         asyncio.run(pipe_obj.run_pipeline(options.reducePipelineName,topo_id,{}))
     except Exception as ex:
