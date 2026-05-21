@@ -206,7 +206,7 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
     logger.add(log_file)
     LOG(f"Logs are stored in {log_file}")
 
-    if not health_check(options): return
+    if not health_check(options): sys.exit("An error occurred during health check!")
     cube_con = ChrisClient(options.CUBEurl, options.CUBEtoken)
 
     mapper = PathMapper.file_mapper(inputdir, outputdir, glob=options.pattern)
