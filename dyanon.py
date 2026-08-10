@@ -1,16 +1,18 @@
 #!/usr/bin/env python
-
+from collections import ChainMap
+from chrisClient import ChrisClient
 from pathlib import Path
 from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
 from loguru import logger
 from chris_plugin import chris_plugin, PathMapper
 from pipeline import Pipeline
 from runnable import Runnable
+from notifications import ConsoleChannel, NotificationEvent, NotificationManager, NotificationContext
+from chris_notification_channel import ChRISNotificationChannel
+
 import pandas as pd
 import json
 import itertools
-from collections import ChainMap
-from chrisClient import ChrisClient
 import pfdcm
 import sys
 import time
@@ -18,6 +20,7 @@ import os
 import concurrent.futures
 import asyncio
 import requests
+
 LOG = logger.debug
 
 logger_format = (
@@ -177,6 +180,30 @@ parser.add_argument(
     type=str,
     help='Filter the output on file type before joining'
 )
+
+def _get_or_env(value, env_key):
+    return value or os.environ[env_key]
+
+def configure_notifications(options):
+    mgr = NotificationManager.instance()
+
+    mgr.register_channel(ConsoleChannel())
+    mgr.register_channel(
+        ChRISNotificationChannel(
+            cube_url=options.CUBEurl,
+            cube_token=options.CUBEtoken,
+            smtp_server=options.SMTPServer,
+        )
+    )
+
+    # Edit this (or load_routing_from_file(...)) to change who gets notified
+    # for which event - no code changes needed elsewhere.
+    mgr.configure_routing(NotificationEvent.START, ["console"])
+    mgr.configure_routing(NotificationEvent.SUCCESS, ["console", "chris"])
+    mgr.configure_routing(NotificationEvent.ERROR, ["console", "chris"])
+    mgr.configure_routing(NotificationEvent.END, ["console"])
+
+    return mgr
 # The main function of this *ChRIS* plugin is denoted by this ``@chris_plugin`` "decorator."
 # Some metadata about the plugin is specified here. There is more metadata specified in setup.py.
 #
@@ -294,29 +321,67 @@ async def register_and_anonymize(options: Namespace, d_job: dict,cube_con, wait:
 
 def health_check(options) -> bool:
     """
-    check if connections to pfdcm and CUBE is valid
+    check if connections to pfdcm and CUBE are valid
     """
+    LOG("health_check starting")
+
     try:
-        if not options.pluginInstanceID:
-            options.pluginInstanceID = os.environ['CHRIS_PREV_PLG_INST_ID']
+        # Resolve required options from env if missing
+        options.pluginInstanceID = _get_or_env(
+            options.pluginInstanceID, 'CHRIS_PREV_PLG_INST_ID'
+        )
+        options.CUBEtoken = _get_or_env(
+            options.CUBEtoken, 'CHRIS_USER_TOKEN'
+        )
     except Exception as ex:
         LOG(ex)
         return False
+
     try:
-        # create connection object
-        if not options.CUBEtoken:
-            options.CUBEtoken = os.environ['CHRIS_USER_TOKEN']
+        mgr = configure_notifications(options)
+        LOG(f"Manager configured. Channels: {list(mgr.channels.keys())}")
+        LOG(f"ERROR routes to: {mgr.routing.get(NotificationEvent.ERROR, [])}")
+    except Exception as e:
+        LOG(f"ERROR configuring notifications: {e}")
+        raise
+
+    # NOW build run_extra with resolved options
+    run_extra = {
+        "plugin_instance_id": options.pluginInstanceID,
+        "recipients": options.recipients,
+    }
+
+    # CUBE health check
+    try:
         cube_con = ChrisClient(options.CUBEurl, options.CUBEtoken)
         cube_con.health_check()
     except Exception as ex:
         LOG(ex)
+        mgr.notify(NotificationContext(
+            event=NotificationEvent.ERROR,
+            pipeline_name="health_check",
+            step_name="cube_connection",
+            message=f"CUBE health check failed ({options.CUBEurl}): {ex}",
+            error=ex,
+            extra=run_extra,  # ← now has real values
+        ))
         return False
+
+    # PFDCM health check
     try:
-        # pfdcm health check
         pfdcm.health_check(options.PFDCMurl)
     except Exception as ex:
         LOG(ex)
+        mgr.notify(NotificationContext(
+            event=NotificationEvent.ERROR,
+            pipeline_name="health_check",
+            step_name="pfdcm_connection",
+            message=f"PFDCM health check failed ({options.PFDCMurl}): {ex}",
+            error=ex,
+            extra=run_extra,  # ← now has real values
+        ))
         return False
+
     return True
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/

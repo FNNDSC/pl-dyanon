@@ -239,26 +239,27 @@ class Pipeline:
         return {
             "finished_jobs": finished_jobs,
             "total_jobs": finished_jobs + errored_jobs + cancelled_jobs + created_jobs + waiting_jobs + scheduled_jobs + started_jobs + registering_jobs,
-            "workflow_failed": (errored_jobs > 0)
+            "workflow_failed": (errored_jobs > 0 or cancelled_jobs > 0)
         }
 
     async def monitor_pipeline(self, workflow_id, total_jobs, pv_inst, rcpts, smtp, search_data):
-        d_search_data = json.loads(search_data)
-        while True:
-            status = self._get_workflow_status(workflow_id)
-            if status["workflow_failed"]:
-                logger.error("Pipeline failed.")
-                self.run_notification_plugin(pv_inst, "Pipeline failed with errors", rcpts, smtp, d_search_data)
-                break
-            if status["finished_jobs"] >= total_jobs:
-                logger.info("Pipeline complete.")
-                leaf_node_id = self.get_workflow_leaf_node(workflow_id)
-                return leaf_node_id
-                break
-            if status["total_jobs"] < total_jobs:
-                self.run_notification_plugin(pv_inst, "Nodes deleted in pipeline", rcpts, smtp, d_search_data)
-                break
-            time.sleep(20)
+        try:
+            d_search_data = json.loads(search_data)
+            while True:
+                status = self._get_workflow_status(workflow_id)
+                if status["workflow_failed"]:
+                    logger.error("Pipeline failed.")
+                    self.run_notification_plugin(pv_inst, "Pipeline failed with errors", rcpts, smtp, d_search_data)
+                    break
+                if status["finished_jobs"] >= total_jobs:
+                    logger.info("Pipeline complete.")
+                    break
+                if status["total_jobs"] < total_jobs:
+                    self.run_notification_plugin(pv_inst, "Nodes deleted in pipeline", rcpts, smtp, d_search_data)
+                    break
+                time.sleep(20)
+        except Exception as e:
+            logger.exception(f"Monitoring pipeline failed.{str(e)}")
 
     def run_notification_plugin(self, pv_id: int, msg: str, rcpts: str, smtp: str, search_data: str) -> int:
         """
@@ -270,7 +271,7 @@ class Pipeline:
         email_content = (f"An error occurred while fetching the following data from PACS: "
                          f"\nFeed Name: {feed_details['name']}"
                          f"\nDate: {feed_details['date']}"
-                         f"\n\nKindly login to ChRIS as *{feed_details['owner']}* to access the logs for more details.")
+                         f"\n\nPlease login to ChRIS as *{feed_details['owner']}* to access the logs for more details.")
 
         try:
             plugin_id = self._get_plugin_id({"name": "pl-notification", "version": "0.1.0"})
