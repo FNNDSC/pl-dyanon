@@ -236,6 +236,10 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
     if not health_check(options): sys.exit("An error occurred during health check!")
     cube_con = ChrisClient(options.CUBEurl, options.CUBEtoken)
 
+    pacs_registry = cube_con.get_pacs_registry(
+        options.PACSConfigPath
+    )
+
     mapper = PathMapper.file_mapper(inputdir, outputdir, glob=options.pattern)
     for input_file, output_file in mapper:
         LOG(f"Reading input from {input_file}")
@@ -381,6 +385,10 @@ def health_check(options) -> bool:
 def create_query(df: pd.DataFrame):
     l_srch_idx = []
     l_anon_idx = []
+
+    if "PACS" not in df.columns:
+        raise ValueError("Input CSV must contain a 'PACS' column")
+
     for column in df.columns:
         if "search" in str(column).lower():
             l_srch_idx.append(df.columns.get_loc(column))
@@ -389,8 +397,15 @@ def create_query(df: pd.DataFrame):
 
     l_job = []
 
-    for row in df.iterrows():
+    for _, row in df.iterrows():
         d_job = {}
+
+        pacs_key = str(row["PACS"]).strip()
+
+        if not pacs_key:
+            raise ValueError("PACS value cannot be empty")
+
+        d_job["pacs"] = pacs_key
 
         s_col = (df.columns[l_srch_idx].values)
         s_row = (row[1].iloc[l_srch_idx].values)

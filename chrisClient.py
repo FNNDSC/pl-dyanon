@@ -77,3 +77,32 @@ class ChrisClient(BaseClient):
             pipeline_name=params["pipeline"]["name"],
             pipeline_params=plugin_params)
         return d_ret
+
+    def get_pacs_registry(self, path: str) -> dict:
+        """
+        Retrieve the PACS registry from CUBE FS.
+        """
+        ...
+
+    def resolve_pacs(self, registry: dict, pacs_key: str) -> dict:
+        if pacs_key not in registry:
+            raise ValueError(
+                f"PACS key '{pacs_key}' not found in PACS registry"
+            )
+
+        pacs = registry[pacs_key]
+
+        required = {"host", "port", "aet"}
+        missing = required - pacs.keys()
+
+        if missing:
+            raise ValueError(
+                f"PACS '{pacs_key}' missing configuration fields: "
+                f"{', '.join(sorted(missing))}"
+            )
+
+        return {
+            "host": pacs["host"],
+            "port": int(pacs["port"]),
+            "aet": pacs["aet"],
+        }
