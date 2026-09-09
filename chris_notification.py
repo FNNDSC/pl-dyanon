@@ -1,11 +1,7 @@
-import json
 import requests
-from requests.auth import HTTPBasicAuth
 from requests.exceptions import RequestException, Timeout, HTTPError
 from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
 from loguru import logger
-import time
-import asyncio
 from urllib.parse import urlencode
 
 class Notification:
@@ -110,7 +106,6 @@ class Notification:
         Create a plugin instance and return its ID.
         """
         response = self.post_request(f"/plugins/{plugin_id}/instances/", json=params)
-        feed_id = -1
 
         for item in response:
             for field in item.get("data", []):
