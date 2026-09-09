@@ -181,6 +181,8 @@ class Pipeline:
                 plugin_instance_ids.append(instance_id)
 
         plugin_instance_ids.sort()
+        leaf_node = plugin_instance_ids[-1] if plugin_instance_ids else None
+        logger.info(f"Found leaf node for workflow : {leaf_node}")
         return plugin_instance_ids[-1] if plugin_instance_ids else None
 
 
@@ -345,12 +347,9 @@ class Pipeline:
             leaf_node_id = self.get_workflow_leaf_node(workflow_id)
 
             if recipients:
-
                 # Start this in the background (not awaited)
-                task = asyncio.create_task(
+                asyncio.create_task(
                     self.monitor_pipeline(workflow_id, total_jobs, previous_inst, recipients, smtp_server, search_data))
-                result = await task
-                leaf_node_id = result
 
             logger.info(f"Workflow posted successfully")
             return {"status": "Pipeline running", "leaf_node_id": leaf_node_id}

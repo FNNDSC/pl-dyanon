@@ -257,7 +257,7 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
                     l_leaf_node_ids.append(response["leaf_node_id"])
 
         # Fan-in logic on output space -> Reduce
-        if l_leaf_node_ids and options.reducePipelineName:
+        if options.reducePipelineName:
             join_results(options, cube_con, l_leaf_node_ids)
 
 
@@ -268,18 +268,11 @@ if __name__ == '__main__':
 def join_results(options, cube_con: ChrisClient, inst_ids: list):
     logger.info(f"Joining plugin instances: {inst_ids}")
     run_obj = Runnable(options.CUBEurl, options.CUBEtoken)
-    str_instances = ",".join(map(str,inst_ids))
-    filters = []
-    for inst_id in inst_ids:
-        filters.append(f"{options.reduceFilter}")
-    str_filters = ",".join(filters)
+    str_instances = ",".join(map(str, inst_ids))
     try:
-        topo_id = run_obj.run_plugin(inst_ids[0],"pl-topologicalcopy",{
-            "plugininstances":str_instances,
-            "filter":str_filters,
-        })
+        topo_id = run_obj.run_plugin(inst_ids[0], "pl-topologicalcopy", {"plugininstances": str_instances})
         pipe_obj = Pipeline(cube_con.api_base, cube_con.auth)
-        asyncio.run(pipe_obj.run_pipeline(options.reducePipelineName,topo_id,{}))
+        asyncio.run(pipe_obj.run_pipeline(options.reducePipelineName, topo_id, {}))
     except Exception as ex:
         logger.error(f"Error occurred which running topological copy : {ex}")
 
