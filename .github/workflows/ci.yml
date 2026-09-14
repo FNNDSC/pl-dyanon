@@ -19,7 +19,6 @@ on:
 jobs:
   test:
     name: Unit tests
-    if: false  # delete this line to enable automatic testing
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +41,7 @@ jobs:
   build:
     name: Build
     if: github.event_name == 'push' || github.event_name == 'release'
-    # needs: [ test ]  # uncomment to require passing tests
+    needs: [ test ]  # uncomment to require passing tests
     runs-on: ubuntu-22.04
 
     steps:
