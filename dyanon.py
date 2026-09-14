@@ -18,7 +18,6 @@ import pfdcm
 import sys
 import time
 import os
-import concurrent.futures
 import asyncio
 import requests
 
@@ -106,13 +105,6 @@ parser.add_argument(
     '--pushToRemote',
     help='Remote modality',
     default=''
-)
-parser.add_argument(
-    "--thread",
-    help="use threading to branch in parallel",
-    dest="thread",
-    action="store_true",
-    default=False,
 )
 parser.add_argument(
     "--wait",
@@ -261,18 +253,11 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
         l_job = create_query(df)
         l_leaf_node_ids = []
         # Fan-out logic on input space -> Map
-        if int(options.thread):
-            with concurrent.futures.ThreadPoolExecutor(max_workers=int(options.maxThreads)) as executor:
-                results: Iterator = executor.map(lambda t: register_and_anonymize(options, t, cube_con, pacs_cfg, options.wait), l_job)
-
-            # Wait for all tasks to complete
-            # executor.shutdown(wait=True)
-        else:
-            for d_job in l_job:
-                response = asyncio.run(register_and_anonymize(options, d_job, cube_con, pacs_cfg))
-                LOG(response)
-                if response.get("leaf_node_id") is not None:
-                    l_leaf_node_ids.append(response["leaf_node_id"])
+        for d_job in l_job:
+            response = asyncio.run(register_and_anonymize(options, d_job, cube_con, pacs_cfg))
+            LOG(response)
+            if response.get("leaf_node_id") is not None:
+                l_leaf_node_ids.append(response["leaf_node_id"])
 
         # Fan-in logic on output space -> Reduce
         if options.reducePipelineName:
