@@ -36,6 +36,7 @@ setup(
         "notifications",
         "chris_notification",
         "chris_notification_channel",
+        "cube_pacs_config",
     ],
     install_requires=['chris_plugin'],
     license='MIT',

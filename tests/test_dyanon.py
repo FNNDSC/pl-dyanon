@@ -65,6 +65,7 @@ def test_create_query_single_row():
                 "PatientName": "ANON",
                 "PatientID": "ABC001",
             },
+            "pacs_key": ''
         }
     ]
 
@@ -83,7 +84,7 @@ def test_create_query_multiple_rows():
     assert len(jobs) == 2
 
     assert jobs[0] == {
-        "pacs": "BCH_PROD",
+        "pacs_key": "BCH_PROD",
         "search": {
             "PatientID": "111",
         },
@@ -93,7 +94,7 @@ def test_create_query_multiple_rows():
     }
 
     assert jobs[1] == {
-        "pacs": "BCH_RESEARCH",
+        "pacs_key": "BCH_RESEARCH",
         "search": {
             "PatientID": "222",
         },
@@ -118,7 +119,7 @@ def test_create_query_ignores_unrelated_columns():
 
     assert jobs == [
         {
-            "pacs": "BCH_PROD",
+            "pacs_key": "BCH_PROD",
             "search": {
                 "PatientID": "123",
             },
@@ -140,7 +141,7 @@ def test_create_query_column_detection_is_case_insensitive():
 
     jobs = create_query(df)
 
-    assert jobs[0]["pacs"] == "BCH_PROD"
+    assert jobs[0]["pacs_key"] == "BCH_PROD"
 
     assert jobs[0]["search"] == {
         "PatientID": "123",
@@ -163,7 +164,7 @@ def test_create_query_removes_column_suffix_after_dot():
     jobs = create_query(df)
 
     assert jobs[0] == {
-        "pacs": "BCH_PROD",
+        "pacs_key": "BCH_PROD",
         "search": {
             "PatientID": "123",
         },
@@ -185,7 +186,7 @@ def test_create_query_with_only_search_columns():
 
     assert jobs == [
         {
-            "pacs": "BCH_PROD",
+            "pacs_key": "BCH_PROD",
             "search": {
                 "PatientID": "123",
             },
@@ -206,7 +207,7 @@ def test_create_query_with_only_anon_columns():
 
     assert jobs == [
         {
-            "pacs": "BCH_PROD",
+            "pacs_key": "BCH_PROD",
             "search": {},
             "anon": {
                 "PatientName": "ANON",

@@ -9,6 +9,7 @@ from pipeline import Pipeline
 from runnable import Runnable
 from notifications import ConsoleChannel, NotificationEvent, NotificationManager, NotificationContext
 from chris_notification_channel import ChRISNotificationChannel
+from cube_pacs_config import CubePacsConfig, PACSConfigError
 
 import pandas as pd
 import json
@@ -130,7 +131,20 @@ parser.add_argument(
     '--PACSname',
     default='MINICHRISORTHANC',
     type=str,
-    help='name of the PACS'
+    help='name of the PACS. Used as a fallback when the input CSV does not '
+         'specify a "PACS" column for a given row.'
+)
+parser.add_argument(
+    '--PACSconfigFile',
+    default='',
+    type=str,
+    help='Path (as reported by CUBE, e.g. "home/<user>/uploads/pacs_config.json") '
+         'to a JSON file already present in the CUBE file storage ("CUBE FS") that '
+         'maps PACS names to their {host, port, aet} connection details. When set, '
+         'the PACS named by each CSV row (or by --PACSname if the row omits it) is '
+         'looked up in this file, and the resolved host/port/aet are substituted '
+         'into the search/retrieve/registration steps. When empty (default), no '
+         'substitution occurs and PACS resolution is left entirely to PFDCM, as before.'
 )
 parser.add_argument(
     '--recipients',
@@ -236,9 +250,9 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
     if not health_check(options): sys.exit("An error occurred during health check!")
     cube_con = ChrisClient(options.CUBEurl, options.CUBEtoken)
 
-    pacs_registry = cube_con.get_pacs_registry(
-        options.PACSConfigPath
-    )
+    pacs_cfg = None
+    if options.PACSconfigFile:
+        pacs_cfg = CubePacsConfig(options.CUBEurl, options.CUBEtoken, options.PACSconfigFile)
 
     mapper = PathMapper.file_mapper(inputdir, outputdir, glob=options.pattern)
     for input_file, output_file in mapper:
@@ -249,13 +263,13 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
         # Fan-out logic on input space -> Map
         if int(options.thread):
             with concurrent.futures.ThreadPoolExecutor(max_workers=int(options.maxThreads)) as executor:
-                results: Iterator = executor.map(lambda t: register_and_anonymize(options, t, cube_con, options.wait), l_job)
+                results: Iterator = executor.map(lambda t: register_and_anonymize(options, t, cube_con, pacs_cfg, options.wait), l_job)
 
             # Wait for all tasks to complete
             # executor.shutdown(wait=True)
         else:
             for d_job in l_job:
-                response = asyncio.run(register_and_anonymize(options, d_job, cube_con))
+                response = asyncio.run(register_and_anonymize(options, d_job, cube_con, pacs_cfg))
                 LOG(response)
                 if response.get("leaf_node_id") is not None:
                     l_leaf_node_ids.append(response["leaf_node_id"])
@@ -281,15 +295,42 @@ def join_results(options, cube_con: ChrisClient, inst_ids: list):
         logger.error(f"Error occurred which running topological copy : {ex}")
 
 
-async def register_and_anonymize(options: Namespace, d_job: dict,cube_con, wait: bool = False):
+async def register_and_anonymize(options: Namespace, d_job: dict, cube_con, pacs_cfg=None, wait: bool = False):
     """
     1) Search through PACS for series and register in CUBE
     2) Run anonymize and push workflow on the registered series
     """
+    # A row may name its own PACS via the CSV's "PACS" column; fall back to
+    # the CLI-wide --PACSname when the row doesn't specify one.
+    pacs_key = d_job.pop("pacs_key", "") or options.PACSname
+
     d_job["pull"] = {
         "url": options.PFDCMurl,
-        "pacs": options.PACSname
+        "pacs": pacs_key
     }
+
+    if pacs_cfg is not None:
+        try:
+            pacs_details = pacs_cfg.get_pacs_details(pacs_key)
+            d_job["pull"].update(pacs_details)
+            LOG(f"Resolved PACS '{pacs_key}' -> {pacs_details} via CUBE FS config")
+        except PACSConfigError as ex:
+            logger.error(f"Could not resolve PACS '{pacs_key}' from CUBE FS config: {ex}")
+            mgr = NotificationManager.instance()
+            mgr.notify(NotificationContext(
+                event=NotificationEvent.ERROR,
+                pipeline_name="register_and_anonymize",
+                step_name="pacs_config_lookup",
+                message=f"Could not resolve PACS '{pacs_key}' from CUBE FS config: {ex}",
+                error=ex,
+                extra={
+                    "plugin_instance_id": options.pluginInstanceID,
+                    "recipients": options.recipients,
+                    "pacs_key": pacs_key,
+                },
+            ))
+            return {"status": "Failed", "error": str(ex), "pacs_key": pacs_key}
+
     d_job["notify"] = {
         "recipients": options.recipients,
         "smtp_server": options.SMTPServer
@@ -382,14 +423,17 @@ def health_check(options) -> bool:
     return True
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
+PACS_COLUMN_NAME = "PACS"
+
+
 def create_query(df: pd.DataFrame):
     l_srch_idx = []
     l_anon_idx = []
-
-    if "PACS" not in df.columns:
-        raise ValueError("Input CSV must contain a 'PACS' column")
-
+    pacs_col = None
     for column in df.columns:
+        if str(column).strip().lower() == PACS_COLUMN_NAME.lower():
+            pacs_col = column
+            continue
         if "search" in str(column).lower():
             l_srch_idx.append(df.columns.get_loc(column))
         if "anon" in str(column).lower():
@@ -397,15 +441,8 @@ def create_query(df: pd.DataFrame):
 
     l_job = []
 
-    for _, row in df.iterrows():
+    for row in df.iterrows():
         d_job = {}
-
-        pacs_key = str(row["PACS"]).strip()
-
-        if not pacs_key:
-            raise ValueError("PACS value cannot be empty")
-
-        d_job["pacs"] = pacs_key
 
         s_col = (df.columns[l_srch_idx].values)
         s_row = (row[1].iloc[l_srch_idx].values)
@@ -416,6 +453,11 @@ def create_query(df: pd.DataFrame):
         a_row = (row[1].iloc[l_anon_idx].values)
         a_d = [{k.split('.')[0].split('_')[1]: v} for k, v in zip(a_col, a_row)]
         d_job["anon"] = dict(ChainMap(*a_d))
+
+        # Optional per-row PACS selector, resolved later (via CUBE FS config,
+        # if --PACSconfigFile is set) to that PACS's host/port/aet.
+        pacs_value = row[1].get(pacs_col) if pacs_col is not None else None
+        d_job["pacs_key"] = pacs_value.strip() if isinstance(pacs_value, str) and pacs_value.strip() else ""
 
         l_job.append(d_job)
 
